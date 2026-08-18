@@ -3,7 +3,18 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QVBoxLayout, QWidget
 
+from app_config import APP_VERSION
 from ui.widgets import PrimaryButton, muted
+
+# 录前两个功能时先隐藏后两个；录完改成 True 即可放回首页
+SHOW_CLEAN_AND_SALES = True
+
+ALL_FEATURE_CARDS = [
+    ("merge", "Excel 批量合并", "多个 Excel 合并成一个总表"),
+    ("split", "Excel 数据拆分", "按照指定字段自动拆成多个 Excel"),
+    ("clean", "重复数据清洗", "一键删除重复数据和空白行"),
+    ("sales", "销售数据汇总", "自动统计销售额、数量和人员排名"),
+]
 
 
 class HomePage(QWidget):
@@ -27,16 +38,12 @@ class HomePage(QWidget):
 
         grid = QGridLayout()
         grid.setSpacing(16)
-        cards = [
-            ("merge", "Excel 批量合并", "多个 Excel 合并成一个总表"),
-            ("split", "Excel 数据拆分", "按照指定字段自动拆成多个 Excel"),
-            ("clean", "重复数据清洗", "一键删除重复数据和空白行"),
-            ("sales", "销售数据汇总", "自动统计销售额、数量和人员排名"),
-        ]
+        cards = ALL_FEATURE_CARDS if SHOW_CLEAN_AND_SALES else ALL_FEATURE_CARDS[:2]
         for index, (key, name, desc) in enumerate(cards):
             grid.addWidget(self._card(key, name, desc), index // 2, index % 2)
         layout.addLayout(grid)
         layout.addStretch()
+        layout.addWidget(muted(f"版本 {APP_VERSION}  ·  本地离线处理，不上传文件"))
 
     def _card(self, key: str, name: str, desc: str) -> QFrame:
         box = QFrame()
@@ -51,6 +58,6 @@ class HomePage(QWidget):
         inner.addWidget(muted(desc))
         inner.addStretch()
         btn = PrimaryButton("立即使用")
-        btn.clicked.connect(lambda: self.open_feature.emit(key))
+        btn.clicked.connect(lambda *_, feature_key=key: self.open_feature.emit(feature_key))
         inner.addWidget(btn, alignment=Qt.AlignmentFlag.AlignLeft)
         return box

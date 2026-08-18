@@ -27,8 +27,7 @@ def split_excel(
     if column not in df.columns:
         raise AppError("找不到拆分字段", "请重新选择一个表格里实际存在的字段。")
 
-    series = df[column]
-    groups = list(df.groupby(series, dropna=False, sort=False))
+    groups = list(df.groupby(column, dropna=False, sort=False))
     if not groups:
         raise AppError("没有可以拆分的数据", "请确认表格里至少有一行数据。")
 

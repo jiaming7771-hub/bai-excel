@@ -18,9 +18,33 @@ class CleanResult:
     deleted_rows: int
 
 
+def _is_blank_value(value) -> bool:
+    try:
+        if pd.isna(value):
+            return True
+    except (TypeError, ValueError):
+        pass
+    text = str(value).strip().lower()
+    return text in {"", "nan", "none", "nat", "<na>"}
+
+
 def _is_blank_row(row: pd.Series) -> bool:
-    values = row.astype(str).str.strip()
-    return bool(((values == "") | (values.str.lower() == "nan") | (values.str.lower() == "none")).all())
+    return all(_is_blank_value(value) for value in row.tolist())
+
+
+def _dedupe_by_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    seen: set[str] = set()
+    keep: list = []
+    for idx, value in df[column].items():
+        if _is_blank_value(value):
+            keep.append(idx)
+            continue
+        key = str(value).strip()
+        if key in seen:
+            continue
+        seen.add(key)
+        keep.append(idx)
+    return df.loc[keep]
 
 
 def clean_excel(
@@ -58,7 +82,7 @@ def clean_excel(
             progress_cb(75, f"正在按 {dedupe_column} 去重")
         if dedupe_column not in df.columns:
             raise AppError("找不到去重字段", "请选择表格里实际存在的字段，例如手机号、姓名或订单号。")
-        df = df.drop_duplicates(subset=[dedupe_column], keep="first")
+        df = _dedupe_by_column(df, dedupe_column)
 
     df = df.reset_index(drop=True)
     output = ensure_output_dir() / output_name

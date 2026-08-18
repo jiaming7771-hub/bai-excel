@@ -7,6 +7,6 @@ dist/
 build/
 *.spec.bak
 output/
-testdata/*.xlsx
+testdata/**/*.xlsx
 !testdata/.gitkeep
 logs/

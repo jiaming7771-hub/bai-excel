@@ -5,11 +5,10 @@ from pathlib import Path
 
 import pandas as pd
 from openpyxl.chart import BarChart, Reference
-from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.workbook import Workbook
 
 from app_config import ensure_output_dir
-from utils.excel_utils import read_excel
+from utils.excel_utils import fill_worksheet, read_excel
 from utils.error_handler import AppError
 
 
@@ -110,10 +109,11 @@ def build_sales_report(
         if progress_cb:
             progress_cb(70, "正在汇总月度销售")
         dates = pd.to_datetime(work[date_col], errors="coerce")
-        work["_month"] = dates.dt.to_period("M").astype(str)
+        valid = dates.notna()
+        work = work.loc[valid].copy()
+        work["_month"] = dates.loc[valid].dt.to_period("M").astype(str)
         monthly = (
-            work.dropna(subset=["_month"])
-            .groupby("_month", as_index=False)
+            work.groupby("_month", as_index=False)
             .agg(销售额=("_amount", "sum"), 销量=("_qty", "sum"))
             .rename(columns={"_month": "月份"})
             .sort_values("月份")
@@ -180,5 +180,4 @@ def _write_workbook(
 
 
 def _fill_sheet(ws, df: pd.DataFrame) -> None:
-    for row in dataframe_to_rows(df, index=False, header=True):
-        ws.append(list(row))
+    fill_worksheet(ws, df)
