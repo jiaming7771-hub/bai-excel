@@ -60,3 +60,16 @@ def open_folder(path: str | Path) -> None:
         os.startfile(str(folder))  # type: ignore[attr-defined]
     else:
         subprocess.Popen(["xdg-open", str(folder)])
+
+
+def open_file(path: str | Path) -> None:
+    """用系统默认程序打开文件（如 WPS / Excel）。"""
+    target = Path(path).expanduser().resolve()
+    if not target.exists():
+        raise AppError("找不到结果文件", "请确认文件还在，或重新运行一次处理。")
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", str(target)])
+    elif os.name == "nt":
+        os.startfile(str(target))  # type: ignore[attr-defined]
+    else:
+        subprocess.Popen(["xdg-open", str(target)])

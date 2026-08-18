@@ -9,6 +9,11 @@ QMainWindow, #root {
     background: #F3F5F8;
 }
 
+QScrollArea, QScrollArea::viewport {
+    background: #F3F5F8;
+    border: none;
+}
+
 QLabel#appTitle {
     font-size: 28px;
     font-weight: 700;
@@ -17,7 +22,7 @@ QLabel#appTitle {
 
 QLabel#appSubtitle {
     font-size: 15px;
-    color: #6B7280;
+    color: #374151;
 }
 
 QLabel#pageTitle {
@@ -28,11 +33,17 @@ QLabel#pageTitle {
 
 QLabel#pageHint {
     font-size: 13px;
-    color: #6B7280;
+    color: #374151;
 }
 
 QLabel#muted {
-    color: #6B7280;
+    color: #374151;
+}
+
+QLabel#fileInfo {
+    color: #111827;
+    font-size: 14px;
+    font-weight: 600;
 }
 
 QFrame#card {
@@ -94,24 +105,40 @@ QComboBox, QLineEdit {
     border-radius: 10px;
     padding: 8px 12px;
     background: white;
+    color: #111827;
     min-height: 36px;
 }
 
 QCheckBox {
     spacing: 8px;
+    color: #111827;
 }
 
 QProgressBar {
     border: none;
     background: #E5E7EB;
     border-radius: 8px;
-    height: 14px;
+    height: 16px;
     text-align: center;
+    color: #111827;
+    font-size: 11px;
 }
 
 QProgressBar::chunk {
     background: #2563EB;
     border-radius: 8px;
+}
+
+QFrame#progressPanel {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 12px;
+}
+
+QLabel#progressLabel {
+    color: #111827;
+    font-size: 13px;
+    font-weight: 600;
 }
 
 QListWidget {

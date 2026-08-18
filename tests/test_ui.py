@@ -6,7 +6,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QPushButton
 
-from ui.home_page import SHOW_CLEAN_AND_SALES, HomePage
+from ui.home_page import SHOW_SALES, HomePage
 from ui.main_window import MainWindow
 
 
@@ -24,7 +24,7 @@ def test_home_cards_open_the_right_feature():
     seen: list[str] = []
     page.open_feature.connect(seen.append)
     buttons = page.findChildren(QPushButton)
-    expected = ["merge", "split", "clean", "sales"] if SHOW_CLEAN_AND_SALES else ["merge", "split"]
+    expected = ["merge", "split", "clean", "sales"] if SHOW_SALES else ["merge", "split", "clean"]
     assert [btn.text() for btn in buttons] == ["立即使用"] * len(expected)
     for btn in buttons:
         btn.click()

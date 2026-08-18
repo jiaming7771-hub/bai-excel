@@ -6,13 +6,13 @@ from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QVBoxLayout, QWidget
 from app_config import APP_VERSION
 from ui.widgets import PrimaryButton, muted
 
-# 录前两个功能时先隐藏后两个；录完改成 True 即可放回首页
-SHOW_CLEAN_AND_SALES = True
+# 销售汇总先不放首页：透视一下就能做，卖点不够强
+SHOW_SALES = False
 
 ALL_FEATURE_CARDS = [
     ("merge", "Excel 批量合并", "多个 Excel 合并成一个总表"),
     ("split", "Excel 数据拆分", "按照指定字段自动拆成多个 Excel"),
-    ("clean", "重复数据清洗", "一键删除重复数据和空白行"),
+    ("clean", "数据清洗", "去重空白、窜行归位、异常标出，修复可追溯"),
     ("sales", "销售数据汇总", "自动统计销售额、数量和人员排名"),
 ]
 
@@ -38,7 +38,7 @@ class HomePage(QWidget):
 
         grid = QGridLayout()
         grid.setSpacing(16)
-        cards = ALL_FEATURE_CARDS if SHOW_CLEAN_AND_SALES else ALL_FEATURE_CARDS[:2]
+        cards = [c for c in ALL_FEATURE_CARDS if SHOW_SALES or c[0] != "sales"]
         for index, (key, name, desc) in enumerate(cards):
             grid.addWidget(self._card(key, name, desc), index // 2, index % 2)
         layout.addLayout(grid)

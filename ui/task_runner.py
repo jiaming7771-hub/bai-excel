@@ -32,5 +32,9 @@ class TaskHost(QObject):
         thread.finished.connect(self._clear)
         thread.start()
 
+    def cancel(self) -> None:
+        if self._thread and self._thread.isRunning():
+            self._thread.request_cancel()
+
     def _clear(self) -> None:
         self._thread = None

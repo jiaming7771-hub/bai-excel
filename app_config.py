@@ -3,7 +3,7 @@ import sys
 
 APP_NAME = "Excel小工具箱"
 APP_SUBTITLE = "批量处理 Excel，让重复工作一键完成"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 EXCEL_SUFFIXES = {".xlsx", ".xls"}
 

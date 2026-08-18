@@ -35,6 +35,7 @@ class FeaturePage(QWidget):
         self.progress = ProgressPanel()
         self.status = StatusBox()
         self.status.retry_clicked.connect(self.on_retry)
+        self.progress.cancel_clicked.connect(self.tasks.cancel)
 
     def attach_status(self) -> None:
         self.layout_box.addWidget(self.progress)
@@ -48,7 +49,8 @@ class FeaturePage(QWidget):
         self.status.clear()
 
     def set_busy(self, busy: bool) -> None:
-        self.progress.setVisible(busy)
         if busy:
             self.progress.start("正在处理……")
             self.status.clear()
+        else:
+            self.progress.hide_panel()

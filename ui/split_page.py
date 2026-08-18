@@ -38,6 +38,7 @@ class SplitPage(FeaturePage):
         self.layout_box.addLayout(buttons)
 
         self.file_label = QLabel("还没有选择文件")
+        self.file_label.setObjectName("fileInfo")
         self.layout_box.addWidget(self.file_label)
 
         self.field = FieldSelect("按照哪个字段拆分？")

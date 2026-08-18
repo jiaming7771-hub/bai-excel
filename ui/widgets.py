@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from utils.file_utils import open_folder
+from utils.file_utils import open_file, open_folder
 
 
 def card(*widgets: QWidget) -> QFrame:
@@ -67,13 +67,12 @@ class GhostButton(QPushButton):
 class DropZone(QFrame):
     files_dropped = Signal(list)
 
-    def __init__(self, hint: str = "将 Excel 文件拖到这里", parent=None) -> None:
+    def __init__(self, text: str, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("dropZone")
         self.setAcceptDrops(True)
         layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label = QLabel(hint)
+        self.label = QLabel(text)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setObjectName("muted")
         layout.addWidget(self.label)
@@ -84,14 +83,11 @@ class DropZone(QFrame):
             self.style().unpolish(self)
             self.style().polish(self)
             event.acceptProposedAction()
-        else:
-            event.ignore()
 
     def dragLeaveEvent(self, event) -> None:
         self.setProperty("active", False)
         self.style().unpolish(self)
         self.style().polish(self)
-        event.accept()
 
     def dropEvent(self, event: QDropEvent) -> None:
         self.setProperty("active", False)
@@ -116,7 +112,7 @@ class StatusBox(QFrame):
         self.detail.setWordWrap(True)
         self.detail.setObjectName("muted")
         self.retry_btn = SecondaryButton("重新选择文件")
-        self.open_btn = SecondaryButton("打开输出文件夹")
+        self.open_btn = SecondaryButton("打开结果文件")
         self.retry_btn.clicked.connect(self.retry_clicked.emit)
         self.open_btn.clicked.connect(self.open_clicked.emit)
         self.layout_box.addWidget(self.title)
@@ -155,32 +151,65 @@ class StatusBox(QFrame):
         self.title.style().polish(self.title)
 
 
-class ProgressPanel(QWidget):
+class ProgressPanel(QFrame):
+    """独立进度卡片：与上方表格分离，避免文字叠在表头上。"""
+
+    cancel_clicked = Signal()
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("progressPanel")
+        self.setMinimumHeight(78)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(8)
+
         self.label = QLabel("正在处理……")
+        self.label.setObjectName("progressLabel")
+        self.label.setWordWrap(True)
+
+        row = QHBoxLayout()
+        row.setSpacing(10)
         self.bar = QProgressBar()
         self.bar.setRange(0, 100)
         self.bar.setValue(0)
+        self.bar.setTextVisible(True)
         self.bar.setFormat("%p%")
+        self.bar.setFixedHeight(16)
+        self.cancel_btn = QPushButton("取消")
+        self.cancel_btn.setObjectName("secondary")
+        self.cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cancel_btn.setFixedWidth(72)
+        self.cancel_btn.clicked.connect(self.cancel_clicked.emit)
+        row.addWidget(self.bar, stretch=1)
+        row.addWidget(self.cancel_btn, alignment=Qt.AlignmentFlag.AlignVCenter)
+
         layout.addWidget(self.label)
-        layout.addWidget(self.bar)
+        layout.addLayout(row)
         self.setVisible(False)
 
     def start(self, text: str = "正在处理……") -> None:
         self.label.setText(text)
         self.bar.setValue(0)
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.setVisible(True)
         self.setVisible(True)
 
     def update_progress(self, value: int, text: str) -> None:
         self.label.setText(text)
-        self.bar.setValue(value)
+        self.bar.setValue(max(0, min(100, int(value))))
+        if not self.isVisible():
+            self.start(text)
+        self.cancel_btn.setEnabled(True)
 
-    def finish(self) -> None:
-        self.label.setText("处理完成！")
+    def finish(self, text: str = "处理完成！") -> None:
+        self.label.setText(text)
         self.bar.setValue(100)
+        self.cancel_btn.setEnabled(False)
+
+    def hide_panel(self) -> None:
+        self.cancel_btn.setEnabled(False)
+        self.setVisible(False)
 
 
 class FieldSelect(QWidget):
@@ -213,4 +242,8 @@ def checkbox(text: str) -> QCheckBox:
 
 
 def open_output(path: str | Path) -> None:
-    open_folder(path)
+    target = Path(path)
+    if target.is_file():
+        open_file(target)
+    else:
+        open_folder(target)

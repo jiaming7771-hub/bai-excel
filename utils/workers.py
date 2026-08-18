@@ -18,13 +18,23 @@ class JobThread(QThread):
     def __init__(self, job: JobFn, parent=None) -> None:
         super().__init__(parent)
         self._job = job
+        self._cancel_requested = False
+
+    def request_cancel(self) -> None:
+        self._cancel_requested = True
+        self.requestInterruption()
 
     def run(self) -> None:
         def callback(value: int, text: str = "正在处理……") -> None:
+            if self._cancel_requested or self.isInterruptionRequested():
+                raise AppError("已取消", "本次处理已取消，原文件未改动。")
             self.progress.emit(max(0, min(100, int(value))), text)
 
         try:
             result = self._job(callback)
+            if self._cancel_requested or self.isInterruptionRequested():
+                self.failed.emit("已取消", "本次处理已取消，原文件未改动。")
+                return
             self.succeeded.emit(result)
         except AppError as exc:
             self.failed.emit(exc.title, exc.hint)

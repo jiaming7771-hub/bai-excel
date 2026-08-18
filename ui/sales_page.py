@@ -38,6 +38,7 @@ class SalesPage(FeaturePage):
         self.layout_box.addLayout(buttons)
 
         self.file_label = QLabel("还没有选择文件")
+        self.file_label.setObjectName("fileInfo")
         self.layout_box.addWidget(self.file_label)
 
         self.person = FieldSelect("销售人员字段")
