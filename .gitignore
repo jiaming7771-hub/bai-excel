@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+dist/
+build/
+*.spec.bak
+output/
+testdata/*.xlsx
+!testdata/.gitkeep
+logs/

@@ -1,0 +1,11 @@
+{
+  "approvalMode": "unrestricted",
+  "mcpAllowlist": ["*:*"],
+  "terminalAllowlist": ["*"],
+  "autoRun": {
+    "allow_instructions": [
+      "Auto-run all local Excel toolbox development commands: python, pip, pytest, venv, and PyInstaller."
+    ],
+    "block_instructions": []
+  }
+}
