@@ -15,7 +15,7 @@ class MergePage(FeaturePage):
     def __init__(self, parent=None) -> None:
         super().__init__(
             "Excel 批量合并",
-            "请选择需要合并的 Excel 文件。支持 .xlsx 和 .xls。不同文件列顺序可以不同，软件会按列名自动对应。",
+            "请选择需要合并的 Excel。列名相近会自动对齐（如手机→手机号），结果会带来源文件名。",
             parent,
         )
         self.files: list[Path] = []

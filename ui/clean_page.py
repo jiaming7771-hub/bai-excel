@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLabel
+from PySide6.QtWidgets import QComboBox, QFileDialog, QHBoxLayout, QLabel
 
 from core.excel_clean import CleanResult, clean_excel
 from ui.feature_page import FeaturePage
@@ -13,13 +13,14 @@ from utils.file_utils import collect_excel_files, open_file
 
 
 COMMON_FIELDS = ["手机号", "姓名", "身份证号", "邮箱", "订单号", "客户编号"]
+DATE_HINTS = ("日期", "下单", "时间", "入职", "更新", "创建")
 
 
 class CleanPage(FeaturePage):
     def __init__(self, parent=None) -> None:
         super().__init__(
             "数据清洗",
-            "空白/重复可删；能修的自动修并标黄，修不了的进待核对。结果带清洗报告，方便抽查。",
+            "空白/重复可删；字段去重支持组合键、保留最新；能修的自动修并标黄。",
             parent,
         )
         self.file_path: Path | None = None
@@ -45,7 +46,6 @@ class CleanPage(FeaturePage):
         self.file_label.setObjectName("fileInfo")
         self.layout_box.addWidget(self.file_label)
 
-        # 一套默认规则，全部默认勾选
         self.opt_dup = checkbox("删除完全重复行")
         self.opt_blank = checkbox("删除空白行")
         self.opt_shifted = checkbox("尝试归位窜行（能修标黄，修不了待核对）")
@@ -69,12 +69,38 @@ class CleanPage(FeaturePage):
         self.opt_field.setChecked(True)
         self.layout_box.addWidget(self.opt_field)
 
-        self.field = FieldSelect("去重字段（默认保留第一条，建议选手机号）")
+        self.field = FieldSelect("去重字段 1（必选，建议手机号）")
+        self.field2 = FieldSelect("去重字段 2（可选，做组合键，如姓名）")
         self.layout_box.addWidget(self.field)
-        self.opt_field.toggled.connect(self.field.setEnabled)
+        self.layout_box.addWidget(self.field2)
 
+        self.layout_box.addWidget(QLabel("重复时保留哪一条？"))
+        self.keep_mode = QComboBox()
+        self.keep_mode.addItem("保留第一条", "first")
+        self.keep_mode.addItem("保留最后一条", "last")
+        self.keep_mode.addItem("按日期保留最新", "latest")
+        self.keep_mode.currentIndexChanged.connect(self._sync_keep_ui)
+        self.layout_box.addWidget(self.keep_mode)
+
+        self.latest_field = FieldSelect("日期字段（按最新保留时使用）")
+        self.layout_box.addWidget(self.latest_field)
+
+        self.opt_field.toggled.connect(self._sync_dedupe_ui)
         self.status.open_clicked.connect(self.open_output)
         self.attach_status()
+        self._sync_dedupe_ui()
+
+    def _sync_dedupe_ui(self) -> None:
+        enabled = self.opt_field.isChecked()
+        self.field.setEnabled(enabled)
+        self.field2.setEnabled(enabled)
+        self.keep_mode.setEnabled(enabled)
+        self._sync_keep_ui()
+
+    def _sync_keep_ui(self) -> None:
+        enabled = self.opt_field.isChecked() and str(self.keep_mode.currentData() or "") == "latest"
+        self.latest_field.setEnabled(enabled)
+        self.latest_field.setVisible(True)
 
     def add_paths(self, paths: list[str]) -> None:
         try:
@@ -92,14 +118,22 @@ class CleanPage(FeaturePage):
     def on_retry(self) -> None:
         self.pick_file()
 
-    def _refresh_field_choices(self) -> None:
-        preferred = [name for name in COMMON_FIELDS if name in self.columns] + [
+    def _preferred_fields(self) -> list[str]:
+        return [name for name in COMMON_FIELDS if name in self.columns] + [
             col for col in self.columns if col not in COMMON_FIELDS
         ]
+
+    def _refresh_field_choices(self) -> None:
+        preferred = self._preferred_fields()
         selected = next((c for c in self.columns if "手机" in str(c)), None)
         if not selected:
             selected = next((name for name in COMMON_FIELDS if name in self.columns), preferred[0] if preferred else None)
         self.field.set_fields(preferred or self.columns, selected)
+        self.field2.set_fields(preferred or self.columns, None)
+
+        date_cols = [c for c in self.columns if any(h in str(c) for h in DATE_HINTS)]
+        date_selected = date_cols[0] if date_cols else (preferred[0] if preferred else None)
+        self.latest_field.set_fields(self.columns, date_selected)
 
     def load_file(self, path: Path) -> None:
         try:
@@ -120,17 +154,35 @@ class CleanPage(FeaturePage):
         if not self.file_path:
             self.status.show_error("请先选择 Excel 文件", "把文件拖进来，或点击“选择文件”。")
             return
-        dedupe_column = self.field.value() if self.opt_field.isChecked() else None
-        if self.opt_field.isChecked() and not dedupe_column:
-            self.status.show_error("请选择去重字段", "例如选择手机号、姓名、订单号。")
-            return
+
+        dedupe_columns: list[str] | None = None
+        dedupe_keep = "first"
+        dedupe_latest_column = None
+        if self.opt_field.isChecked():
+            col1 = self.field.value()
+            col2 = self.field2.value()
+            if not col1:
+                self.status.show_error("请选择去重字段", "例如选择手机号；也可再选姓名做组合键。")
+                return
+            dedupe_columns = [col1]
+            if col2 and col2 != col1:
+                dedupe_columns.append(col2)
+            dedupe_keep = str(self.keep_mode.currentData() or "first")
+            if dedupe_keep == "latest":
+                dedupe_latest_column = self.latest_field.value()
+                if not dedupe_latest_column:
+                    self.status.show_error("请选择日期字段", "「按日期保留最新」需要选一列日期/更新时间。")
+                    return
+
         self.set_busy(True)
         self.start_btn.setEnabled(False)
         path = self.file_path
         options = dict(
             drop_duplicates=self.opt_dup.isChecked(),
             drop_blank_rows=self.opt_blank.isChecked(),
-            dedupe_column=dedupe_column,
+            dedupe_columns=dedupe_columns,
+            dedupe_keep=dedupe_keep,
+            dedupe_latest_column=dedupe_latest_column,
             check_shifted_rows=self.opt_shifted.isChecked(),
             fix_phone=self.opt_phone.isChecked(),
             fix_email=self.opt_email.isChecked(),

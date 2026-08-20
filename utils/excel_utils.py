@@ -31,20 +31,40 @@ TEXT_COLUMN_HINTS = (
 )
 
 
-def read_excel(path: str | Path) -> pd.DataFrame:
+def normalize_header_name(name: object) -> str:
+    text = str(name).replace("\u3000", " ").strip()
+    return " ".join(text.split())
+
+
+def list_sheet_names(path: str | Path) -> list[str]:
     file_path = Path(path)
     suffix = file_path.suffix.lower()
     try:
         if suffix == ".xls":
-            df = pd.read_excel(file_path, engine="xlrd", dtype=object)
+            book = pd.ExcelFile(file_path, engine="xlrd")
         else:
-            df = pd.read_excel(file_path, engine="openpyxl", dtype=object)
+            book = pd.ExcelFile(file_path, engine="openpyxl")
+        names = [str(name) for name in book.sheet_names]
+        book.close()
+        return names
+    except Exception as exc:
+        raise friendly_error(exc) from exc
+
+
+def read_excel(path: str | Path, sheet_name: str | int | None = 0) -> pd.DataFrame:
+    file_path = Path(path)
+    suffix = file_path.suffix.lower()
+    try:
+        if suffix == ".xls":
+            df = pd.read_excel(file_path, sheet_name=sheet_name, engine="xlrd", dtype=object)
+        else:
+            df = pd.read_excel(file_path, sheet_name=sheet_name, engine="openpyxl", dtype=object)
     except Exception as exc:
         raise friendly_error(exc) from exc
 
     if df is None or df.empty:
         raise AppError("Excel 文件是空的", "请确认表格里至少有一行数据。")
-    df.columns = [str(c).strip() for c in df.columns]
+    df.columns = [normalize_header_name(c) for c in df.columns]
     if any(col.startswith("Unnamed") for col in df.columns) and len(df.columns) == 1:
         raise AppError("没有识别到表头", "请确认第一行是表头，并且表格内容完整。")
     return normalize_text_columns(df)

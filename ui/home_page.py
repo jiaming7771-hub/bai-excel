@@ -10,9 +10,10 @@ from ui.widgets import PrimaryButton, muted
 SHOW_SALES = False
 
 ALL_FEATURE_CARDS = [
-    ("merge", "Excel 批量合并", "多个 Excel 合并成一个总表"),
-    ("split", "Excel 数据拆分", "按照指定字段自动拆成多个 Excel"),
-    ("clean", "数据清洗", "去重空白、窜行归位、异常标出，修复可追溯"),
+    ("merge", "Excel 批量合并", "多表合并，自动对齐列名，带来源文件"),
+    ("split", "Excel 数据拆分", "按字段 / 工作表 / 行数拆成多个文件"),
+    ("clean", "数据清洗", "去重可保留最新，异常标出，修复可追溯"),
+    ("compare", "Excel 两表对比", "找出仅在A、仅在B、以及改动字段"),
     ("sales", "销售数据汇总", "自动统计销售额、数量和人员排名"),
 ]
 

@@ -354,21 +354,89 @@ def inspect_quality(df: pd.DataFrame) -> dict:
     }
 
 
-def _dedupe_by_column_with_removed(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    seen: set[str] = set()
-    keep: list = []
-    removed: list = []
-    for idx, value in df[column].items():
+def _dedupe_key(row: pd.Series, columns: list[str]) -> str | None:
+    parts: list[str] = []
+    all_blank = True
+    for column in columns:
+        value = row.get(column)
         if _is_blank_value(value):
-            keep.append(idx)
+            parts.append("")
             continue
-        key = str(value).strip()
-        if key in seen:
-            removed.append(idx)
-            continue
-        seen.add(key)
-        keep.append(idx)
-    return df.loc[keep], df.loc[removed]
+        all_blank = False
+        parts.append(str(value).strip())
+    if all_blank:
+        return None
+    return "||".join(parts)
+
+
+def _sort_key_for_latest(value) -> tuple:
+    """用于「保留最新」排序：能解析成日期的优先，否则按字符串。"""
+    if _is_blank_value(value):
+        return (0, "")
+    parsed = parse_date_value(value)
+    if parsed is not None:
+        return (1, parsed.isoformat())
+    text = _text(value)
+    return (1, text)
+
+
+def _dedupe_by_columns_with_removed(
+    df: pd.DataFrame,
+    columns: list[str],
+    *,
+    keep: str = "first",
+    latest_column: str | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    keep_mode = (keep or "first").strip().lower()
+    if keep_mode not in {"first", "last", "latest"}:
+        keep_mode = "first"
+
+    working = df
+    if keep_mode == "latest":
+        if not latest_column or latest_column not in df.columns:
+            raise AppError("请选择日期字段", "「按日期保留最新」需要选择一列日期/时间字段。")
+        # 旧→新排序，后面同键保留最后一条 = 最新
+        sort_values = df[latest_column].map(_sort_key_for_latest)
+        working = df.assign(_latest_sort=sort_values).sort_values("_latest_sort", kind="stable")
+        working = working.drop(columns=["_latest_sort"])
+        keep_mode = "last"
+
+    seen: set[str] = set()
+    keep_idxs: list = []
+    removed_idxs: list = []
+
+    iterator = list(working.index)
+    if keep_mode == "last":
+        # 从后往前扫，先遇到的留下
+        for idx in reversed(iterator):
+            key = _dedupe_key(working.loc[idx], columns)
+            if key is None:
+                keep_idxs.append(idx)
+                continue
+            if key in seen:
+                removed_idxs.append(idx)
+                continue
+            seen.add(key)
+            keep_idxs.append(idx)
+        keep_idxs.reverse()
+        removed_idxs.reverse()
+    else:
+        for idx in iterator:
+            key = _dedupe_key(working.loc[idx], columns)
+            if key is None:
+                keep_idxs.append(idx)
+                continue
+            if key in seen:
+                removed_idxs.append(idx)
+                continue
+            seen.add(key)
+            keep_idxs.append(idx)
+
+    return working.loc[keep_idxs], working.loc[removed_idxs]
+
+
+def _dedupe_by_column_with_removed(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    return _dedupe_by_columns_with_removed(df, [column], keep="first")
 
 
 def _take_removed(work: pd.DataFrame, mask: pd.Series, reason: str) -> tuple[pd.DataFrame, pd.DataFrame, int]:
@@ -385,6 +453,9 @@ def clean_excel(
     drop_duplicates: bool = False,
     drop_blank_rows: bool = False,
     dedupe_column: str | None = None,
+    dedupe_columns: list[str] | None = None,
+    dedupe_keep: str = "first",
+    dedupe_latest_column: str | None = None,
     check_shifted_rows: bool = False,
     fix_phone: bool = False,
     fix_email: bool = False,
@@ -394,10 +465,16 @@ def clean_excel(
     output_name: str = "cleaned_result.xlsx",
     progress_cb=None,
 ) -> CleanResult:
+    columns_for_dedupe: list[str] = []
+    if dedupe_columns:
+        columns_for_dedupe = [c for c in dedupe_columns if c]
+    elif dedupe_column:
+        columns_for_dedupe = [dedupe_column]
+
     options = [
         drop_duplicates,
         drop_blank_rows,
-        bool(dedupe_column),
+        bool(columns_for_dedupe),
         check_shifted_rows,
         fix_phone,
         fix_email,
@@ -428,6 +505,10 @@ def clean_excel(
     email_col = find_column(list(work.columns), ("邮箱", "邮件", "email", "mail"))
     name_col = find_column(list(work.columns), ("姓名", "客户名", "联系人", "名字"))
     date_col = find_column(list(work.columns), ("日期", "下单", "时间", "入职"))
+    dedupe_label = " + ".join(columns_for_dedupe) if columns_for_dedupe else None
+    keep_label = {"first": "保留第一条", "last": "保留最后一条", "latest": "按日期保留最新"}.get(
+        (dedupe_keep or "first").lower(), "保留第一条"
+    )
 
     def mark_fixed(uid: int, column: str, old=None, new=None, reason: str = "已自动修复") -> None:
         nonlocal fixed_cells
@@ -577,15 +658,21 @@ def clean_excel(
             part = part.drop(columns=["_row_uid"], errors="ignore")
             removed_parts.append(part)
 
-    if dedupe_column:
+    if columns_for_dedupe:
         if progress_cb:
-            progress_cb(84, f"正在按 {dedupe_column} 去重")
-        if dedupe_column not in work.columns:
-            raise AppError("找不到去重字段", "请选择表格里实际存在的字段，例如手机号、姓名或订单号。")
-        kept, field_part = _dedupe_by_column_with_removed(work, dedupe_column)
+            progress_cb(84, f"正在按 {dedupe_label} 去重（{keep_label}）")
+        missing = [c for c in columns_for_dedupe if c not in work.columns]
+        if missing:
+            raise AppError("找不到去重字段", f"表格里没有：{'、'.join(missing)}。请重新选择。")
+        kept, field_part = _dedupe_by_columns_with_removed(
+            work,
+            columns_for_dedupe,
+            keep=dedupe_keep,
+            latest_column=dedupe_latest_column,
+        )
         if not field_part.empty:
             field_part = field_part.drop(columns=["_row_uid"], errors="ignore").copy()
-            field_part.insert(0, "删除原因", f"按{dedupe_column}去重（已保留第一条）")
+            field_part.insert(0, "删除原因", f"按{dedupe_label}去重（{keep_label}）")
             removed_parts.append(field_part)
             field_deleted = len(field_part)
         work = kept
@@ -708,7 +795,7 @@ def clean_excel(
         fixed_cells=fixed_cells,
         review_rows=review_count,
         quality_score=score,
-        dedupe_column=dedupe_column,
+        dedupe_column=f"{dedupe_label}（{keep_label}）" if dedupe_label else None,
         source_name=Path(path).name,
     )
     if progress_cb:

@@ -37,7 +37,17 @@ def test_clean_requires_option(testdata, tmp_path, monkeypatch):
 
     monkeypatch.setattr(app_config, "OUTPUT_DIR", tmp_path)
     with pytest.raises(AppError) as exc:
-        clean_excel(testdata["clean"])
+        clean_excel(
+            testdata["clean"],
+            drop_duplicates=False,
+            drop_blank_rows=False,
+            check_shifted_rows=False,
+            fix_phone=False,
+            fix_email=False,
+            fix_dates=False,
+            check_required_fields=False,
+            trim_spaces=False,
+        )
     assert "清洗方式" in exc.value.title
 
 

@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 
 from app_config import APP_NAME
 from ui.clean_page import CleanPage
+from ui.compare_page import ComparePage
 from ui.home_page import HomePage
 from ui.merge_page import MergePage
 from ui.sales_page import SalesPage
@@ -15,7 +16,7 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle(APP_NAME)
-        self.resize(920, 720)
+        self.resize(920, 740)
         self.setMinimumSize(820, 640)
         self.setStyleSheet(APP_STYLE)
 
@@ -32,6 +33,7 @@ class MainWindow(QMainWindow):
         self.merge = MergePage()
         self.split = SplitPage()
         self.clean = CleanPage()
+        self.compare = ComparePage()
         self.sales = SalesPage()
 
         self.pages = {
@@ -39,6 +41,7 @@ class MainWindow(QMainWindow):
             "merge": self.merge,
             "split": self.split,
             "clean": self.clean,
+            "compare": self.compare,
             "sales": self.sales,
         }
         for page in self.pages.values():
@@ -48,6 +51,7 @@ class MainWindow(QMainWindow):
         self.merge.back_requested.connect(lambda: self.show_page("home"))
         self.split.back_requested.connect(lambda: self.show_page("home"))
         self.clean.back_requested.connect(lambda: self.show_page("home"))
+        self.compare.back_requested.connect(lambda: self.show_page("home"))
         self.sales.back_requested.connect(lambda: self.show_page("home"))
         self.setAcceptDrops(True)
 

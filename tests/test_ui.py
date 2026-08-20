@@ -14,7 +14,8 @@ def test_main_window_builds():
     app = QApplication.instance() or QApplication([])
     window = MainWindow()
     assert window.windowTitle() == "Excel小工具箱"
-    assert window.stack.count() == 5
+    # home + merge + split + clean + compare + sales
+    assert window.stack.count() == 6
     app.processEvents()
 
 
@@ -24,7 +25,11 @@ def test_home_cards_open_the_right_feature():
     seen: list[str] = []
     page.open_feature.connect(seen.append)
     buttons = page.findChildren(QPushButton)
-    expected = ["merge", "split", "clean", "sales"] if SHOW_SALES else ["merge", "split", "clean"]
+    expected = (
+        ["merge", "split", "clean", "compare", "sales"]
+        if SHOW_SALES
+        else ["merge", "split", "clean", "compare"]
+    )
     assert [btn.text() for btn in buttons] == ["立即使用"] * len(expected)
     for btn in buttons:
         btn.click()
