@@ -1,0 +1,20 @@
+﻿【Windows 打包 — 必读】
+
+刚才报错 Permission denied .venv 的原因：
+你从 Mac 拷过来的文件夹里带了 Mac 的 .venv，Windows 用不了。
+
+已修好脚本：会自动删掉旧 .venv，再新建 Windows 环境。
+
+请再做一次：
+1. 把新的 build_windows.bat 覆盖到 Windows 那份脚本
+   （或把整个 excel-toolbox 重新拷一遍）
+2. 双击 scripts\build_windows.bat
+3. 看到 Preparing Windows venv / Removing old/Mac .venv 属正常
+4. 成功后桌面：Excel小工具箱发布\Excel小工具箱.exe
+
+若仍然删不掉 .venv：
+- 关掉所有打开该文件夹的窗口
+- 手动删除：Desktop\excel-toolbox\.venv
+- 再双击 bat
+
+成功后只需把 exe 发给 Windows 用户。

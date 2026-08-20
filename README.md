@@ -77,43 +77,43 @@ python -m pytest -q
 pip install -r requirements.txt
 ```
 
-### Windows 打包命令
-
-在 Windows 电脑上执行：
-
-```bat
-pyinstaller --noconfirm --clean --windowed --onefile --name "Excel小工具箱" --hidden-import pandas --hidden-import openpyxl --hidden-import xlrd main.py
-```
-
-生成文件：
-
-```text
-dist\Excel小工具箱.exe
-```
-
-也可以使用仓库里的 spec：
-
-```bat
-pyinstaller --noconfirm excel_toolbox.spec
-```
-
-### macOS 打包命令
-
-在 Mac 上执行：
+### macOS 打包（本机一键）
 
 ```bash
-pyinstaller --noconfirm --clean --windowed --name "Excel小工具箱" --hidden-import pandas --hidden-import openpyxl --hidden-import xlrd main.py
+./scripts/build_mac.sh
 ```
 
-生成文件：
+生成到桌面 `Excel小工具箱发布/`：
+
+- `Excel小工具箱.app`（可直接双击）
+- `Excel小工具箱-macOS.zip`（发给用户）
+
+第一次打开如果提示“无法验证开发者”，请右键选择打开，或到系统设置里允许。
+
+### Windows 打包（必须在 Windows 电脑上执行）
+
+Mac 无法直接打出 Windows 的 `.exe`。把整个 `excel-toolbox` 文件夹拷到 Windows 后：
+
+1. 安装 [Python 3.10+](https://www.python.org/downloads/)（勾选 Add Python to PATH）
+2. 双击运行：
 
 ```text
-dist/Excel小工具箱.app
+scripts\build_windows.bat
 ```
 
-如果需要单个可执行文件，也可以加 `--onefile`，但 macOS 更推荐 `.app` 文件夹形式。
+成功后桌面会出现：
 
-第一次打开如果提示“无法验证开发者”，请在系统设置里允许打开，或右键选择打开。
+```text
+Excel小工具箱发布\Excel小工具箱.exe
+```
+
+把这个 `.exe` 发给用户即可，双击就能用，不需要安装 Python。
+
+也可以手动执行：
+
+```bat
+pyinstaller --noconfirm --clean excel_toolbox_windows.spec
+```
 
 ## 说明
 
