@@ -36,6 +36,7 @@ class HomePage(QWidget):
         layout.addWidget(title)
         layout.addWidget(subtitle)
         layout.addWidget(hint)
+        layout.addWidget(self._whats_new())
 
         grid = QGridLayout()
         grid.setSpacing(16)
@@ -45,6 +46,25 @@ class HomePage(QWidget):
         layout.addLayout(grid)
         layout.addStretch()
         layout.addWidget(muted(f"版本 {APP_VERSION}  ·  本地离线处理，不上传文件"))
+
+    def _whats_new(self) -> QFrame:
+        box = QFrame()
+        box.setObjectName("card")
+        inner = QVBoxLayout(box)
+        inner.setContentsMargins(18, 14, 18, 14)
+        inner.setSpacing(6)
+        heading = QLabel(f"本版更新（v{APP_VERSION}）")
+        heading.setObjectName("pageTitle")
+        heading.setStyleSheet("font-size: 16px;")
+        body = muted(
+            "1. 合并：自动对齐相近列名，结果会写明来自哪个文件\n"
+            "2. 拆分：除了按字段，还能按工作表、按行数拆\n"
+            "3. 清洗：去重可留最新一条，也能用两列一起判断重复\n"
+            "4. 新增：两表对比，一眼看出多了谁、少了谁、改了啥"
+        )
+        inner.addWidget(heading)
+        inner.addWidget(body)
+        return box
 
     def _card(self, key: str, name: str, desc: str) -> QFrame:
         box = QFrame()

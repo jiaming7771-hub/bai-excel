@@ -247,6 +247,7 @@ def generate_cases(root: Path | None = None) -> dict[str, Path]:
     split_dir = cases / "02-按部门拆分"
     clean_dir = cases / "03-客户名单清洗"
     sales_dir = cases / "04-销售数据汇总"
+    compare_dir = cases / "05-两表对比"
 
     east = _save(
         pd.DataFrame(
@@ -331,6 +332,36 @@ def generate_cases(root: Path | None = None) -> dict[str, Path]:
     ]
     sales = _save(pd.DataFrame(sales_rows), sales_dir / "销售明细.xlsx")
 
+    compare_old = _save(
+        pd.DataFrame(
+            [
+                {"手机号": "13800138001", "姓名": "张三", "城市": "上海", "会员等级": "银卡", "备注": "老客户"},
+                {"手机号": "13800138002", "姓名": "李四", "城市": "北京", "会员等级": "普通", "备注": ""},
+                {"手机号": "13800138003", "姓名": "王五", "城市": "广州", "会员等级": "金卡", "备注": "要跟进"},
+                {"手机号": "13800138004", "姓名": "赵六", "城市": "深圳", "会员等级": "普通", "备注": "仅在旧表"},
+                {"手机号": "13800138005", "姓名": "钱七", "城市": "杭州", "会员等级": "钻石", "备注": "会改城市"},
+            ]
+        ),
+        compare_dir / "客户名单_旧版.xlsx",
+    )
+    compare_new = _save(
+        pd.DataFrame(
+            [
+                {"手机号": "13800138001", "姓名": "张三", "城市": "杭州", "会员等级": "银卡", "备注": "老客户"},
+                {"手机号": "13800138002", "姓名": "李四", "城市": "北京", "会员等级": "普通", "备注": ""},
+                {"手机号": "13800138003", "姓名": "王五", "城市": "广州", "会员等级": "钻石", "备注": "要跟进"},
+                {"手机号": "13800138005", "姓名": "钱七", "城市": "宁波", "会员等级": "钻石", "备注": "会改城市"},
+                {"手机号": "13800138006", "姓名": "孙八", "城市": "苏州", "会员等级": "普通", "备注": "新客户"},
+            ]
+        ),
+        compare_dir / "客户名单_新版.xlsx",
+    )
+    (compare_dir / "怎么测.txt").write_text(
+        "表A选旧版，表B选新版，主键选手机号。\n"
+        "预期：仅在A=赵六；仅在B=孙八；有变化=张三/王五/钱七；相同=李四。\n",
+        encoding="utf-8",
+    )
+
     return {
         "east": east,
         "south": south,
@@ -338,6 +369,8 @@ def generate_cases(root: Path | None = None) -> dict[str, Path]:
         "staff": staff,
         "customers": customers,
         "sales": sales,
+        "compare_old": compare_old,
+        "compare_new": compare_new,
     }
 
 
