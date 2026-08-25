@@ -15,7 +15,7 @@ class MergePage(FeaturePage):
     def __init__(self, parent=None) -> None:
         super().__init__(
             "Excel 批量合并",
-            "请选择需要合并的 Excel。列名相近会自动对齐（如手机→手机号），结果会带来源文件名。",
+            "请选择需要合并的 Excel。列名相近会自动对齐；结果里带「列对齐报告」，不用逐行猜哪列没对上。",
             parent,
         )
         self.files: list[Path] = []
@@ -97,7 +97,7 @@ class MergePage(FeaturePage):
         self.output_path = result.output_path
         self.status.show_ok(
             "处理完成！",
-            f"合并完成，共处理 {result.file_count} 个文件，共 {result.row_count} 条数据。",
+            result.detail_text or f"合并完成，共处理 {result.file_count} 个文件，共 {result.row_count} 条数据。",
             result.output_path,
         )
 

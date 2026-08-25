@@ -26,6 +26,27 @@ def test_merge_adds_source_and_aligns_aliases(tmp_path, monkeypatch):
     assert df["手机号"].astype(str).tolist() == ["13800138001", "13900139001"]
 
 
+def test_merge_writes_alignment_report_sheets(tmp_path, monkeypatch):
+    import app_config
+
+    monkeypatch.setattr(app_config, "OUTPUT_DIR", tmp_path)
+    a = tmp_path / "a.xlsx"
+    b = tmp_path / "b.xlsx"
+    pd.DataFrame([{"姓名": "张三", "手机": "13800138001", "销售额": 100}]).to_excel(a, index=False)
+    pd.DataFrame([{"客户名": "李四", "联系电话": "13900139001", "销售金额": 200}]).to_excel(b, index=False)
+
+    result = merge_excels([a, b])
+    book = pd.ExcelFile(result.output_path)
+    assert "合并结果" in book.sheet_names
+    assert "列对齐报告" in book.sheet_names
+    assert "列名对照" in book.sheet_names
+    assert "空值统计" in book.sheet_names
+    merged = pd.read_excel(result.output_path, sheet_name="合并结果")
+    assert "销售额" in merged.columns
+    assert "销售金额" not in merged.columns
+    assert result.warning_count >= 0
+
+
 def test_split_by_sheet_and_rows(tmp_path, monkeypatch):
     import app_config
 
