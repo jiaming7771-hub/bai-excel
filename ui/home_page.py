@@ -1,13 +1,23 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QGridLayout,
+    QLabel,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from app_config import APP_VERSION
 from ui.widgets import PrimaryButton, muted
 
 # 销售汇总先不放首页：透视一下就能做，卖点不够强
 SHOW_SALES = False
+
+FEATURE_CARD_HEIGHT = 152
 
 ALL_FEATURE_CARDS = [
     ("merge", "Excel 批量合并", "多表合并，自动对齐列名，带来源文件"),
@@ -23,69 +33,94 @@ class HomePage(QWidget):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 28, 32, 28)
-        layout.setSpacing(18)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
 
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(36, 28, 36, 20)
+        layout.setSpacing(20)
+
+        header = QVBoxLayout()
+        header.setSpacing(6)
         title = QLabel("Excel小工具箱")
         title.setObjectName("appTitle")
         subtitle = QLabel("批量处理 Excel，让重复工作一键完成")
         subtitle.setObjectName("appSubtitle")
-        hint = muted("打开后选择文件，点一下按钮就能完成原来要大量复制粘贴的工作。全程在您的电脑本地处理，不联网，也不上传文件。")
+        header.addWidget(title)
+        header.addWidget(subtitle)
+        layout.addLayout(header)
 
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
-        layout.addWidget(hint)
+        layout.addWidget(
+            muted(
+                "打开后选择文件，点一下按钮就能完成原来要大量复制粘贴的工作。"
+                "全程在您的电脑本地处理，不联网，也不上传文件。"
+            )
+        )
         layout.addWidget(self._whats_new())
 
-        grid = QGridLayout()
-        grid.setSpacing(16)
+        grid_host = QWidget()
+        grid = QGridLayout(grid_host)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(14)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
+        grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+
         cards = [c for c in ALL_FEATURE_CARDS if SHOW_SALES or c[0] != "sales"]
         for index, (key, name, desc) in enumerate(cards):
-            card = self._card(key, name, desc)
-            card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-            grid.addWidget(card, index // 2, index % 2)
-        for row in range((len(cards) + 1) // 2):
-            grid.setRowStretch(row, 1)
-        layout.addLayout(grid)
-        layout.addStretch()
-        layout.addWidget(muted(f"版本 {APP_VERSION}  ·  本地离线处理，不上传文件"))
+            grid.addWidget(self._card(key, name, desc), index // 2, index % 2)
+
+        layout.addWidget(grid_host)
+        layout.addSpacing(4)
+        footer = muted(f"版本 {APP_VERSION}  ·  本地离线处理，不上传文件")
+        footer.setObjectName("homeFooter")
+        layout.addWidget(footer)
+
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
 
     def _whats_new(self) -> QFrame:
         box = QFrame()
-        box.setObjectName("card")
+        box.setObjectName("highlightBox")
         inner = QVBoxLayout(box)
-        inner.setContentsMargins(18, 14, 18, 14)
-        inner.setSpacing(6)
+        inner.setContentsMargins(16, 12, 16, 12)
+        inner.setSpacing(4)
         heading = QLabel(f"本版更新（v{APP_VERSION}）")
-        heading.setObjectName("pageTitle")
-        heading.setStyleSheet("font-size: 16px;")
+        heading.setObjectName("highlightTitle")
         body = muted(
-            "1. 合并：自动对齐相近列名，结果会写明来自哪个文件\n"
-            "2. 拆分：除了按字段，还能按工作表、按行数拆\n"
-            "3. 清洗：去重可留最新一条，也能用两列一起判断重复\n"
-            "4. 新增：两表对比，一眼看出多了谁、少了谁、改了啥"
+            "合并对齐列名并标注来源 · 拆分支持工作表/行数 · 清洗可组合去重 · 新增两表对比"
         )
+        body.setObjectName("highlightBody")
         inner.addWidget(heading)
         inner.addWidget(body)
         return box
 
     def _card(self, key: str, name: str, desc: str) -> QFrame:
         box = QFrame()
-        box.setObjectName("card")
-        box.setMinimumHeight(172)
+        box.setObjectName("featureCard")
+        box.setFixedHeight(FEATURE_CARD_HEIGHT)
+        box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
         inner = QVBoxLayout(box)
-        inner.setContentsMargins(22, 20, 22, 22)
-        inner.setSpacing(8)
+        inner.setContentsMargins(18, 16, 18, 16)
+        inner.setSpacing(0)
+
         heading = QLabel(name)
-        heading.setObjectName("pageTitle")
-        heading.setStyleSheet("font-size: 18px;")
+        heading.setObjectName("featureTitle")
         inner.addWidget(heading)
-        inner.addWidget(muted(desc))
-        inner.addStretch(1)
-        inner.addSpacing(4)
+
+        description = muted(desc)
+        description.setObjectName("featureDesc")
+        description.setFixedHeight(40)
+        inner.addWidget(description)
+
+        inner.addSpacing(10)
         btn = PrimaryButton("立即使用")
         btn.clicked.connect(lambda *_, feature_key=key: self.open_feature.emit(feature_key))
         inner.addWidget(btn, alignment=Qt.AlignmentFlag.AlignLeft)

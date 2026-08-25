@@ -52,6 +52,46 @@ QFrame#card {
     border-radius: 16px;
 }
 
+QFrame#featureCard {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 14px;
+}
+
+QFrame#highlightBox {
+    background: #EFF6FF;
+    border: 1px solid #BFDBFE;
+    border-radius: 12px;
+}
+
+QLabel#highlightTitle {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1E40AF;
+}
+
+QLabel#highlightBody {
+    color: #1E3A8A;
+    font-size: 13px;
+}
+
+QLabel#featureTitle {
+    font-size: 17px;
+    font-weight: 700;
+    color: #111827;
+}
+
+QLabel#featureDesc {
+    color: #4B5563;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+QLabel#homeFooter {
+    color: #6B7280;
+    font-size: 12px;
+}
+
 QFrame#dropZone {
     background: #F8FAFC;
     border: 2px dashed #CBD5E1;
