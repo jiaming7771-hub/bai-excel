@@ -66,15 +66,17 @@ QFrame#dropZone[active="true"] {
 QPushButton {
     border: none;
     border-radius: 10px;
-    padding: 10px 18px;
+    padding: 0 18px;
     font-size: 14px;
+    margin: 0;
 }
 
 QPushButton#primary {
-    background: #2563EB;
+    background-color: #2563EB;
     color: white;
     font-weight: 600;
-    min-height: 40px;
+    border: 1px solid #2563EB;
+    min-width: 108px;
 }
 
 QPushButton#primary:hover {

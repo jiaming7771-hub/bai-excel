@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from app_config import APP_VERSION
 from ui.widgets import PrimaryButton, muted
@@ -40,9 +40,15 @@ class HomePage(QWidget):
 
         grid = QGridLayout()
         grid.setSpacing(16)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
         cards = [c for c in ALL_FEATURE_CARDS if SHOW_SALES or c[0] != "sales"]
         for index, (key, name, desc) in enumerate(cards):
-            grid.addWidget(self._card(key, name, desc), index // 2, index % 2)
+            card = self._card(key, name, desc)
+            card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            grid.addWidget(card, index // 2, index % 2)
+        for row in range((len(cards) + 1) // 2):
+            grid.setRowStretch(row, 1)
         layout.addLayout(grid)
         layout.addStretch()
         layout.addWidget(muted(f"版本 {APP_VERSION}  ·  本地离线处理，不上传文件"))
@@ -69,15 +75,17 @@ class HomePage(QWidget):
     def _card(self, key: str, name: str, desc: str) -> QFrame:
         box = QFrame()
         box.setObjectName("card")
+        box.setMinimumHeight(172)
         inner = QVBoxLayout(box)
-        inner.setContentsMargins(22, 20, 22, 20)
+        inner.setContentsMargins(22, 20, 22, 22)
         inner.setSpacing(8)
         heading = QLabel(name)
         heading.setObjectName("pageTitle")
         heading.setStyleSheet("font-size: 18px;")
         inner.addWidget(heading)
         inner.addWidget(muted(desc))
-        inner.addStretch()
+        inner.addStretch(1)
+        inner.addSpacing(4)
         btn = PrimaryButton("立即使用")
         btn.clicked.connect(lambda *_, feature_key=key: self.open_feature.emit(feature_key))
         inner.addWidget(btn, alignment=Qt.AlignmentFlag.AlignLeft)

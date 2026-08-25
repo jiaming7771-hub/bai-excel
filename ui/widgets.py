@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QProgressBar,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -48,6 +49,8 @@ class PrimaryButton(QPushButton):
         super().__init__(text, parent)
         self.setObjectName("primary")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedHeight(40)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
 
 class SecondaryButton(QPushButton):
