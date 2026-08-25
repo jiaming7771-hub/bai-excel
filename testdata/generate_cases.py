@@ -40,6 +40,17 @@ PRODUCTS = [
 ]
 WAREHOUSES = ["杭州仓", "广州仓", "上海仓"]
 SHIP_STATUSES = ["待发货", "已发货", "已签收", "已取消"]
+DEPARTMENTS = ["华东", "华南", "华北", "西南", "线上", "客服中心"]
+JOBS = ["销售", "主管", "客服", "运营"]
+MERGE_STORES = [
+    ("华东门店.xlsx", "east", 38, 1),
+    ("华南门店.xlsx", "south", 32, 100),
+    ("华北门店.xlsx", "north", 28, 200),
+    ("西南门店.xlsx", "southwest", 24, 300),
+    ("华中门店.xlsx", "central", 20, 400),
+    ("线上渠道.xlsx", "online", 35, 500),
+]
+SPLIT_SHEETS = ["华东", "华南", "华北", "西南", "线上", "汇总备查"]
 
 
 def _save(df: pd.DataFrame, path: Path) -> Path:
@@ -254,6 +265,154 @@ def _build_clean_rows(total: int = 1200) -> list[dict]:
     return rows
 
 
+def _save_sheets(sheets: dict[str, pd.DataFrame], path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        for name, df in sheets.items():
+            df.to_excel(writer, sheet_name=name[:31], index=False)
+    return path
+
+
+def _merge_stats(paths: list[Path]):
+    import tempfile
+
+    import app_config
+    from core.excel_merge import merge_excels
+
+    tmp = Path(tempfile.mkdtemp())
+    prev = app_config.OUTPUT_DIR
+    try:
+        app_config.OUTPUT_DIR = tmp
+        result = merge_excels(paths)
+        df = pd.read_excel(result.output_path)
+        return result, df
+    finally:
+        app_config.OUTPUT_DIR = prev
+
+
+def _split_stats(path: Path, mode: str, column: str | None = None, rows_per_file: int = 200):
+    import tempfile
+
+    import app_config
+    from core.excel_split import split_excel
+
+    tmp = Path(tempfile.mkdtemp())
+    prev = app_config.OUTPUT_DIR
+    try:
+        app_config.OUTPUT_DIR = tmp
+        return split_excel(path, column=column, mode=mode, rows_per_file=rows_per_file)
+    finally:
+        app_config.OUTPUT_DIR = prev
+
+
+def _build_merge_store_df(style: str, count: int, base_i: int, rng: random.Random) -> pd.DataFrame:
+    rows: list[dict] = []
+    for j in range(count):
+        i = base_i + j
+        if style == "east":
+            rows.append(
+                {
+                    "姓名": _person_name(i),
+                    "手机号": _phone(i),
+                    "销售额": rng.randint(3200, 28000),
+                    "城市": EXT_CITIES[i % len(EXT_CITIES)],
+                }
+            )
+        elif style == "south":
+            rows.append(
+                {
+                    "销售额": rng.randint(3200, 28000),
+                    "姓名": _person_name(i),
+                    "手机": _phone(i),
+                    "城市": EXT_CITIES[i % len(EXT_CITIES)],
+                }
+            )
+        elif style == "north":
+            rows.append(
+                {
+                    "姓名": _person_name(i),
+                    "销售额": rng.randint(3200, 28000),
+                    "联系电话": _phone(i),
+                }
+            )
+        elif style == "southwest":
+            rows.append(
+                {
+                    "客户名": _person_name(i),
+                    "手机号": _phone(i),
+                    "销售金额": rng.randint(3200, 28000),
+                }
+            )
+        elif style == "central":
+            rows.append({"姓名": _person_name(i), "销售额": rng.randint(3200, 28000)})
+        else:
+            rows.append(
+                {
+                    "姓名": _person_name(i),
+                    "手机号": _phone(i),
+                    "销售额": rng.randint(3200, 28000),
+                    "来源渠道": CHANNELS[i % len(CHANNELS)],
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _build_staff_rows(total: int = 168) -> list[dict]:
+    rng = random.Random(20260828)
+    rows: list[dict] = []
+    for i in range(total):
+        rows.append(
+            {
+                "姓名": _person_name(i),
+                "部门": DEPARTMENTS[i % len(DEPARTMENTS)],
+                "岗位": JOBS[i % len(JOBS)],
+                "入职日期": date(2020, 1, 1) + timedelta(days=i * 13),
+                "销售额": rng.randint(0, 32000),
+                "城市": EXT_CITIES[i % len(EXT_CITIES)],
+            }
+        )
+    return rows
+
+
+def _build_region_sheet_rows(region: str, count: int, base_i: int, rng: random.Random) -> list[dict]:
+    rows: list[dict] = []
+    for j in range(count):
+        i = base_i + j
+        rows.append(
+            {
+                "姓名": _person_name(i),
+                "手机号": _phone(i),
+                "销售额": rng.randint(2500, 24000),
+                "城市": EXT_CITIES[i % len(EXT_CITIES)],
+                "渠道": CHANNELS[i % len(CHANNELS)],
+            }
+        )
+    return rows
+
+
+def _build_big_order_rows(count: int = 620) -> list[dict]:
+    rng = random.Random(20260829)
+    rows: list[dict] = []
+    for i in range(count):
+        sku, pname, price = PRODUCTS[i % len(PRODUCTS)]
+        qty = rng.randint(1, 8)
+        rows.append(
+            {
+                "订单号": f"ORD{2025}{i:05d}",
+                "日期": date(2025, 1, 1) + timedelta(days=i % 120),
+                "客户姓名": _person_name(i),
+                "手机号": _phone(i),
+                "商品": pname,
+                "商品编码": sku,
+                "数量": qty,
+                "单价": price,
+                "金额": qty * price,
+                "仓库": WAREHOUSES[i % len(WAREHOUSES)],
+            }
+        )
+    return rows
+
+
 def _compare_stats(old_path: Path, new_path: Path, key_columns: list[str]):
     """生成时自测对比结果，写入怎么测.txt 用。"""
     import tempfile
@@ -395,57 +554,72 @@ def generate_cases(root: Path | None = None) -> dict[str, Path]:
     cases.mkdir(parents=True, exist_ok=True)
 
     merge_dir = cases / "01-批量合并"
-    split_dir = cases / "02-按部门拆分"
+    split_dir = cases / "02-数据拆分"
     clean_dir = cases / "03-客户名单清洗"
     sales_dir = cases / "04-销售数据汇总"
     compare_dir = cases / "05-两表对比"
 
-    east = _save(
-        pd.DataFrame(
-            [
-                {"姓名": _person_name(i), "手机号": _phone(i), "销售额": 8000 + i * 137}
-                for i in range(1, 19)
-            ]
-        ),
-        merge_dir / "华东门店.xlsx",
-    )
-    south = _save(
-        pd.DataFrame(
-            [
-                {"销售额": 9000 + i * 211, "姓名": _person_name(100 + i), "手机": _phone(100 + i)}
-                for i in range(1, 16)
-            ]
-        ),
-        merge_dir / "华南门店.xlsx",
-    )
-    north = _save(
-        pd.DataFrame(
-            [
-                {"姓名": _person_name(200 + i), "销售额": 7000 + i * 173, "联系电话": _phone(200 + i)}
-                for i in range(1, 14)
-            ]
-        ),
-        merge_dir / "华北门店.xlsx",
+    merge_rng = random.Random(20260827)
+    merge_paths: list[Path] = []
+    merge_meta: list[str] = []
+    merge_files: dict[str, Path] = {}
+    merge_row_sum = 0
+    for filename, style, count, base_i in MERGE_STORES:
+        df = _build_merge_store_df(style, count, base_i, merge_rng)
+        path = _save(df, merge_dir / filename)
+        merge_paths.append(path)
+        merge_files[style] = path
+        merge_row_sum += len(df)
+        merge_meta.append(f"  · {filename}（{len(df)} 行，列：{', '.join(df.columns)}）")
+
+    merge_result, merged_df = _merge_stats(merge_paths)
+    source_values = set(merged_df["来源文件"].astype(str))
+    (merge_dir / "怎么测.txt").write_text(
+        "【01-批量合并 · 复杂测试数据】\n\n"
+        "文件夹内 6 个门店/渠道表，列名故意不统一：\n"
+        + "\n".join(merge_meta)
+        + "\n\n操作：全选本文件夹 → 开始合并\n"
+        f"自测：合并后约 {len(merged_df)} 行，含「来源文件」「手机号」列；"
+        f"6 个来源文件名都能在结果里找到。\n"
+        "亮点：手机/联系电话/客户名/销售金额 等会自动对齐。",
+        encoding="utf-8",
     )
 
-    staff = _save(
-        pd.DataFrame(
-            [
-                {"姓名": "陈晨", "部门": "华东", "岗位": "销售", "入职日期": date(2023, 3, 1), "销售额": 18000},
-                {"姓名": "林小雨", "部门": "华南", "岗位": "销售", "入职日期": date(2022, 11, 12), "销售额": 22000},
-                {"姓名": "黄伟", "部门": "华东", "岗位": "主管", "入职日期": date(2021, 6, 8), "销售额": 31000},
-                {"姓名": "周杰", "部门": "华北", "岗位": "销售", "入职日期": date(2024, 1, 15), "销售额": 9600},
-                {"姓名": "吴敏", "部门": "华南", "岗位": "客服", "入职日期": date(2023, 8, 20), "销售额": 0},
-                {"姓名": "徐丽", "部门": "华东", "岗位": "销售", "入职日期": date(2024, 4, 2), "销售额": 12500},
-                {"姓名": "孙浩", "部门": "西南", "岗位": "销售", "入职日期": date(2022, 5, 18), "销售额": 14700},
-                {"姓名": "马芳", "部门": "华北", "岗位": "销售", "入职日期": date(2023, 9, 9), "销售额": 20300},
-                {"姓名": "高强", "部门": "西南", "岗位": "主管", "入职日期": date(2020, 2, 1), "销售额": 28600},
-                {"姓名": "何静", "部门": "华南", "岗位": "销售", "入职日期": date(2024, 7, 1), "销售额": 5400},
-                {"姓名": "罗斌", "部门": "华北", "岗位": "客服", "入职日期": date(2021, 12, 3), "销售额": 0},
-                {"姓名": "梁娜", "部门": "西南", "岗位": "销售", "入职日期": date(2023, 10, 21), "销售额": 16800},
-            ]
-        ),
-        split_dir / "员工花名册.xlsx",
+    staff_df = pd.DataFrame(_build_staff_rows(168))
+    staff = _save(staff_df, split_dir / "按部门-员工花名册.xlsx")
+    staff_split = _split_stats(staff, "column", column="部门")
+
+    sheet_rng = random.Random(20260830)
+    sheet_map = {
+        name: pd.DataFrame(_build_region_sheet_rows(name, 26 + idx * 3, 600 + idx * 40, sheet_rng))
+        for idx, name in enumerate(SPLIT_SHEETS)
+    }
+    multi_sheet = _save_sheets(sheet_map, split_dir / "按工作表-区域销售.xlsx")
+    sheet_split = _split_stats(multi_sheet, "sheet")
+
+    big_orders = pd.DataFrame(_build_big_order_rows(620))
+    big_table = _save(big_orders, split_dir / "按行数-大表订单.xlsx")
+    row_split = _split_stats(big_table, "rows", rows_per_file=200)
+
+    dept_counts = staff_df["部门"].value_counts().to_dict()
+    (split_dir / "怎么测.txt").write_text(
+        "【02-数据拆分 · 复杂测试数据】\n\n"
+        "一、按字段拆分（推荐录视频先测）\n"
+        f"  文件：按部门-员工花名册.xlsx（{len(staff_df)} 行）\n"
+        "  方式：按字段拆分 → 字段选「部门」\n"
+        f"  自测：拆成 {staff_split.file_count} 个文件（"
+        + "、".join(f"{k}{v}人" for k, v in sorted(dept_counts.items()))
+        + "）\n\n"
+        "二、按工作表拆分\n"
+        f"  文件：按工作表-区域销售.xlsx（{len(SPLIT_SHEETS)} 个 Sheet）\n"
+        "  方式：按工作表拆分\n"
+        f"  自测：拆成 {sheet_split.file_count} 个 xlsx\n\n"
+        "三、按行数拆分\n"
+        f"  文件：按行数-大表订单.xlsx（{len(big_orders)} 行）\n"
+        "  方式：按行数拆分 → 每个文件 200 行\n"
+        f"  自测：拆成 {row_split.file_count} 个文件\n\n"
+        "打开「Excel 数据拆分」→ 选文件 → 选方式 → 开始拆分",
+        encoding="utf-8",
     )
 
     clean_rows = _build_clean_rows(1200)
@@ -514,10 +688,10 @@ def generate_cases(root: Path | None = None) -> dict[str, Path]:
     )
 
     return {
-        "east": east,
-        "south": south,
-        "north": north,
+        **merge_files,
         "staff": staff,
+        "multi_sheet": multi_sheet,
+        "big_table": big_table,
         "customers": customers,
         "sales": sales,
         "pool_old": pool_old,
