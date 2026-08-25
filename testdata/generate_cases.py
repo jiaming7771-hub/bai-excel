@@ -42,13 +42,33 @@ WAREHOUSES = ["杭州仓", "广州仓", "上海仓"]
 SHIP_STATUSES = ["待发货", "已发货", "已签收", "已取消"]
 DEPARTMENTS = ["华东", "华南", "华北", "西南", "线上", "客服中心"]
 JOBS = ["销售", "主管", "客服", "运营"]
+CATEGORIES = ["护肤", "彩妆", "个护", "香氛", "母婴"]
+PAY_METHODS = ["微信", "支付宝", "银行卡", "现金", "对公转账"]
+
+# ── 生产级数据规模（贴近真实业务：多文件合计上万行、单表数千行）──
+PROD_MERGE_ROWS_PER_FILE = 1500
+PROD_STAFF_ROWS = 5000
+PROD_SHEET_ROWS = 800
+PROD_BIG_ORDER_ROWS = 12000
+PROD_BIG_ORDER_SPLIT = 2000
+PROD_CLEAN_BASE = 5000
+PROD_COMPARE_SHARED = 800
+PROD_COMPARE_ONLY_OLD = 80
+PROD_COMPARE_ONLY_NEW = 60
+PROD_COMPARE_CHANGED = 120
+PROD_ORDER_SHARED = 2000
+PROD_ORDER_CHANGED = 250
+PROD_ORDER_ONLY = 120
+
 MERGE_STORES = [
-    ("华东门店.xlsx", "east", 38, 1),
-    ("华南门店.xlsx", "south", 32, 100),
-    ("华北门店.xlsx", "north", 28, 200),
-    ("西南门店.xlsx", "southwest", 24, 300),
-    ("华中门店.xlsx", "central", 20, 400),
-    ("线上渠道.xlsx", "online", 35, 500),
+    ("华东门店.xlsx", "east", PROD_MERGE_ROWS_PER_FILE, 1),
+    ("华南门店.xlsx", "south", PROD_MERGE_ROWS_PER_FILE, 50000),
+    ("华北门店.xlsx", "north", PROD_MERGE_ROWS_PER_FILE, 100000),
+    ("西南门店.xlsx", "southwest", PROD_MERGE_ROWS_PER_FILE, 150000),
+    ("华中门店.xlsx", "central", PROD_MERGE_ROWS_PER_FILE, 200000),
+    ("线上渠道.xlsx", "online", PROD_MERGE_ROWS_PER_FILE, 250000),
+    ("东北门店.xlsx", "east", PROD_MERGE_ROWS_PER_FILE, 300000),
+    ("西北门店.xlsx", "north", PROD_MERGE_ROWS_PER_FILE, 350000),
 ]
 SPLIT_SHEETS = ["华东", "华南", "华北", "西南", "线上", "汇总备查"]
 
@@ -307,21 +327,30 @@ def _split_stats(path: Path, mode: str, column: str | None = None, rows_per_file
 
 def _build_merge_store_df(style: str, count: int, base_i: int, rng: random.Random) -> pd.DataFrame:
     rows: list[dict] = []
+    start = date(2024, 1, 1)
     for j in range(count):
         i = base_i + j
+        common = {
+            "订单日期": start + timedelta(days=j % 365),
+            "商品类目": CATEGORIES[j % len(CATEGORIES)],
+            "支付方式": PAY_METHODS[j % len(PAY_METHODS)],
+            "门店编码": f"S{(i % 900) + 100:03d}",
+        }
         if style == "east":
             rows.append(
                 {
+                    **common,
                     "姓名": _person_name(i),
                     "手机号": _phone(i),
-                    "销售额": rng.randint(3200, 28000),
+                    "销售额": rng.randint(800, 58000),
                     "城市": EXT_CITIES[i % len(EXT_CITIES)],
                 }
             )
         elif style == "south":
             rows.append(
                 {
-                    "销售额": rng.randint(3200, 28000),
+                    **common,
+                    "销售额": rng.randint(800, 58000),
                     "姓名": _person_name(i),
                     "手机": _phone(i),
                     "城市": EXT_CITIES[i % len(EXT_CITIES)],
@@ -330,27 +359,36 @@ def _build_merge_store_df(style: str, count: int, base_i: int, rng: random.Rando
         elif style == "north":
             rows.append(
                 {
+                    **common,
                     "姓名": _person_name(i),
-                    "销售额": rng.randint(3200, 28000),
+                    "销售额": rng.randint(800, 58000),
                     "联系电话": _phone(i),
                 }
             )
         elif style == "southwest":
             rows.append(
                 {
+                    **common,
                     "客户名": _person_name(i),
                     "手机号": _phone(i),
-                    "销售金额": rng.randint(3200, 28000),
+                    "销售金额": rng.randint(800, 58000),
                 }
             )
         elif style == "central":
-            rows.append({"姓名": _person_name(i), "销售额": rng.randint(3200, 28000)})
+            rows.append(
+                {
+                    **common,
+                    "姓名": _person_name(i),
+                    "销售额": rng.randint(800, 58000),
+                }
+            )
         else:
             rows.append(
                 {
+                    **common,
                     "姓名": _person_name(i),
                     "手机号": _phone(i),
-                    "销售额": rng.randint(3200, 28000),
+                    "销售额": rng.randint(800, 58000),
                     "来源渠道": CHANNELS[i % len(CHANNELS)],
                 }
             )
@@ -390,7 +428,7 @@ def _build_region_sheet_rows(region: str, count: int, base_i: int, rng: random.R
     return rows
 
 
-def _build_big_order_rows(count: int = 620) -> list[dict]:
+def _build_big_order_rows(count: int = PROD_BIG_ORDER_ROWS) -> list[dict]:
     rng = random.Random(20260829)
     rows: list[dict] = []
     for i in range(count):
@@ -447,25 +485,27 @@ def _customer_pool_row(index: int, rng: random.Random, note: str = "") -> dict:
 
 
 def _build_compare_customer_pool() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """客户池：约 85 vs 81 行，含删客户、新增、多字段变化、同主键重复、空主键。"""
+    """生产级客户池：约千行级，含删增改、重复主键、空主键。"""
     rng = random.Random(20260825)
-    shared = [_customer_pool_row(i, rng) for i in range(1, 76)]
+    n_shared = PROD_COMPARE_SHARED
+    shared = [_customer_pool_row(i, rng) for i in range(1, n_shared + 1)]
     only_old = [
-        _customer_pool_row(i, rng, "旧表独有-已删除客户") for i in range(76, 86)
+        _customer_pool_row(i, rng, "旧表独有-已删除客户")
+        for i in range(n_shared + 1, n_shared + PROD_COMPARE_ONLY_OLD + 1)
     ]
 
-    dup = dict(shared[12])
+    dup = dict(shared[127])
     dup["客户编号"] = "C_dup1"
     dup["备注"] = "同手机号重复行-旧表多一行"
 
-    empty_key = _customer_pool_row(901, rng, "手机号为空")
+    empty_key = _customer_pool_row(900001, rng, "手机号为空")
     empty_key["客户编号"] = "C_empty"
     empty_key["手机号"] = ""
 
     old_rows = shared + only_old + [dup, empty_key]
     rng.shuffle(old_rows)
 
-    change_idx = set(rng.sample(range(75), 15))
+    change_idx = set(rng.sample(range(n_shared), PROD_COMPARE_CHANGED))
     new_shared: list[dict] = []
     for i, row in enumerate(shared):
         new_row = dict(row)
@@ -480,8 +520,10 @@ def _build_compare_customer_pool() -> tuple[pd.DataFrame, pd.DataFrame]:
                 new_row["负责人"] = MANAGERS[(i + 3) % len(MANAGERS)]
         new_shared.append(new_row)
 
+    only_new_start = n_shared + PROD_COMPARE_ONLY_OLD + 1
     only_new = [
-        _customer_pool_row(i, rng, "新版新增客户") for i in range(86, 92)
+        _customer_pool_row(i, rng, "新版新增客户")
+        for i in range(only_new_start, only_new_start + PROD_COMPARE_ONLY_NEW)
     ]
     new_rows = new_shared + only_new
     rng.shuffle(new_rows)
@@ -489,14 +531,14 @@ def _build_compare_customer_pool() -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def _build_compare_orders() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """订单明细：42 vs 42 行，组合主键订单号+商品编码，一单多商品。"""
+    """生产级订单：约两千行，组合主键，一单多商品。"""
     rng = random.Random(20260826)
 
     def line(order_no: int, sku_idx: int, person_idx: int) -> dict:
         sku, _, price = PRODUCTS[sku_idx % len(PRODUCTS)]
-        qty = rng.randint(1, 5)
+        qty = rng.randint(1, 12)
         return {
-            "订单号": f"SO2025{order_no:04d}",
+            "订单号": f"SO2025{order_no:06d}",
             "商品编码": sku,
             "客户姓名": _person_name(person_idx),
             "手机号": _phone(person_idx),
@@ -505,23 +547,24 @@ def _build_compare_orders() -> tuple[pd.DataFrame, pd.DataFrame]:
             "金额": qty * price,
             "仓库": WAREHOUSES[order_no % len(WAREHOUSES)],
             "发货状态": SHIP_STATUSES[order_no % len(SHIP_STATUSES)],
-            "下单日期": date(2025, 1, 1) + timedelta(days=order_no % 45),
+            "下单日期": date(2025, 1, 1) + timedelta(days=order_no % 180),
         }
 
     shared: list[dict] = []
-    # 30 行完全匹配：24 单商品 + 3 单各 2 个商品
-    for i in range(24):
-        shared.append(line(1000 + i, i % len(PRODUCTS), i + 10))
-    for i in range(3):
-        order_no = 2000 + i
-        shared.append(line(order_no, i % len(PRODUCTS), i + 40))
-        shared.append(line(order_no, (i + 5) % len(PRODUCTS), i + 40))
+    # 单笔订单
+    for i in range(PROD_ORDER_SHARED - 240):
+        shared.append(line(100000 + i, i, i + 10))
+    # 一单多商品（每单 2 行）
+    for i in range(120):
+        order_no = 200000 + i
+        shared.append(line(order_no, i, i + 5000))
+        shared.append(line(order_no, (i + 5) % len(PRODUCTS), i + 5000))
 
     changed_old: list[dict] = []
     changed_new: list[dict] = []
-    for j in range(7):
-        order_no = 3000 + j
-        old_row = line(order_no, j + 2, j + 50)
+    for j in range(PROD_ORDER_CHANGED):
+        order_no = 300000 + j
+        old_row = line(order_no, j + 2, j + 9000)
         new_row = dict(old_row)
         if j % 3 == 0:
             new_row["数量"] = int(old_row["数量"]) + 2
@@ -533,8 +576,8 @@ def _build_compare_orders() -> tuple[pd.DataFrame, pd.DataFrame]:
         changed_old.append(old_row)
         changed_new.append(new_row)
 
-    only_old = [line(4000 + k, k + 5, k + 70) for k in range(5)]
-    only_new = [line(5000 + k, k + 7, k + 80) for k in range(5)]
+    only_old = [line(400000 + k, k + 5, k + 20000) for k in range(PROD_ORDER_ONLY)]
+    only_new = [line(500000 + k, k + 7, k + 30000) for k in range(PROD_ORDER_ONLY)]
 
     old_rows = shared + changed_old + only_old
     new_rows = shared + changed_new + only_new
@@ -575,54 +618,56 @@ def generate_cases(root: Path | None = None) -> dict[str, Path]:
     merge_result, merged_df = _merge_stats(merge_paths)
     source_values = set(merged_df["来源文件"].astype(str))
     (merge_dir / "怎么测.txt").write_text(
-        "【01-批量合并 · 复杂测试数据】\n\n"
-        "文件夹内 6 个门店/渠道表，列名故意不统一：\n"
+        "【01-批量合并 · 生产级测试数据】\n\n"
+        f"8 个区域/渠道表，每个约 {PROD_MERGE_ROWS_PER_FILE} 行，合计约 {merge_row_sum} 行。\n"
+        "列名故意不统一（手机/联系电话/客户名/销售金额 等），并含订单日期、类目、支付方式。\n"
         + "\n".join(merge_meta)
-        + "\n\n操作：全选本文件夹 → 开始合并\n"
-        f"自测：合并后约 {len(merged_df)} 行，含「来源文件」「手机号」列；"
-        f"6 个来源文件名都能在结果里找到。\n"
-        "亮点：手机/联系电话/客户名/销售金额 等会自动对齐。",
+        + "\n\n操作：选中整个文件夹 → 开始合并\n"
+        f"自测：合并后 {len(merged_df)} 行，含「来源文件」「手机号」；"
+        f"{len(source_values)} 个来源文件均可追溯。\n"
+        "适合验证：万级合并速度、列名对齐、来源标注。",
         encoding="utf-8",
     )
 
-    staff_df = pd.DataFrame(_build_staff_rows(168))
+    staff_df = pd.DataFrame(_build_staff_rows(PROD_STAFF_ROWS))
     staff = _save(staff_df, split_dir / "按部门-员工花名册.xlsx")
     staff_split = _split_stats(staff, "column", column="部门")
 
     sheet_rng = random.Random(20260830)
     sheet_map = {
-        name: pd.DataFrame(_build_region_sheet_rows(name, 26 + idx * 3, 600 + idx * 40, sheet_rng))
+        name: pd.DataFrame(
+            _build_region_sheet_rows(name, PROD_SHEET_ROWS, 600 + idx * PROD_SHEET_ROWS, sheet_rng)
+        )
         for idx, name in enumerate(SPLIT_SHEETS)
     }
     multi_sheet = _save_sheets(sheet_map, split_dir / "按工作表-区域销售.xlsx")
     sheet_split = _split_stats(multi_sheet, "sheet")
 
-    big_orders = pd.DataFrame(_build_big_order_rows(620))
+    big_orders = pd.DataFrame(_build_big_order_rows())
     big_table = _save(big_orders, split_dir / "按行数-大表订单.xlsx")
-    row_split = _split_stats(big_table, "rows", rows_per_file=200)
+    row_split = _split_stats(big_table, "rows", rows_per_file=PROD_BIG_ORDER_SPLIT)
 
     dept_counts = staff_df["部门"].value_counts().to_dict()
     (split_dir / "怎么测.txt").write_text(
-        "【02-数据拆分 · 复杂测试数据】\n\n"
-        "一、按字段拆分（推荐录视频先测）\n"
+        "【02-数据拆分 · 生产级测试数据】\n\n"
+        "一、按字段拆分（推荐录视频）\n"
         f"  文件：按部门-员工花名册.xlsx（{len(staff_df)} 行）\n"
-        "  方式：按字段拆分 → 字段选「部门」\n"
+        "  方式：按字段 → 部门\n"
         f"  自测：拆成 {staff_split.file_count} 个文件（"
         + "、".join(f"{k}{v}人" for k, v in sorted(dept_counts.items()))
         + "）\n\n"
         "二、按工作表拆分\n"
-        f"  文件：按工作表-区域销售.xlsx（{len(SPLIT_SHEETS)} 个 Sheet）\n"
-        "  方式：按工作表拆分\n"
+        f"  文件：按工作表-区域销售.xlsx（{len(SPLIT_SHEETS)} 个 Sheet，每表约 {PROD_SHEET_ROWS} 行）\n"
         f"  自测：拆成 {sheet_split.file_count} 个 xlsx\n\n"
         "三、按行数拆分\n"
         f"  文件：按行数-大表订单.xlsx（{len(big_orders)} 行）\n"
-        "  方式：按行数拆分 → 每个文件 200 行\n"
+        f"  方式：按行数 → 每个文件 {PROD_BIG_ORDER_SPLIT} 行\n"
         f"  自测：拆成 {row_split.file_count} 个文件\n\n"
-        "打开「Excel 数据拆分」→ 选文件 → 选方式 → 开始拆分",
+        "适合验证：五千/万级拆分、多 Sheet、大表切分。",
         encoding="utf-8",
     )
 
-    clean_rows = _build_clean_rows(1200)
+    clean_rows = _build_clean_rows(PROD_CLEAN_BASE)
     customers = _save(pd.DataFrame(clean_rows), clean_dir / "客户名单.xlsx")
 
     sales_rows = [
@@ -665,25 +710,23 @@ def generate_cases(root: Path | None = None) -> dict[str, Path]:
 
     _write_compare_guide(
         compare_dir / "怎么测.txt",
-        "【05-两表对比 · 复杂测试数据】",
+        "【05-两表对比 · 生产级测试数据】",
         [
-            "一、客户池（推荐录视频先测这个）\n"
+            "一、客户池（推荐录视频）\n"
             f"  表A：客户池_旧版.xlsx（{len(pool_old_df)} 行）\n"
             f"  表B：客户池_新版.xlsx（{len(pool_new_df)} 行）\n"
             "  主键：手机号\n"
-            f"  自测结果：仅在A {pool_stats.only_a}｜仅在B {pool_stats.only_b}｜"
+            f"  自测：仅在A {pool_stats.only_a}｜仅在B {pool_stats.only_b}｜"
             f"有变化 {pool_stats.changed}｜完全相同 {pool_stats.same}\n"
-            "  场景：删客户、新增客户、多字段改动、同手机号重复、手机号为空、行顺序打乱。",
-            "二、订单明细（进阶 · 组合主键）\n"
-            f"  表A：订单明细_旧版.xlsx（{len(order_old_df)} 行）\n"
-            f"  表B：订单明细_新版.xlsx（{len(order_new_df)} 行）\n"
-            "  主键1：订单号  主键2：商品编码\n"
-            f"  自测结果：仅在A {order_stats.only_a}｜仅在B {order_stats.only_b}｜"
+            "  场景：八百级客户池、删增改、重复主键、空手机号。",
+            "二、订单明细（组合主键）\n"
+            f"  表A/B：各 {len(order_old_df)} 行\n"
+            "  主键：订单号 + 商品编码\n"
+            f"  自测：仅在A {order_stats.only_a}｜仅在B {order_stats.only_b}｜"
             f"有变化 {order_stats.changed}｜完全相同 {order_stats.same}\n"
-            "  注意：一单多商品时必须用组合主键，只选订单号会对不准。",
-            "三、操作步骤\n"
-            "  打开「Excel 两表对比」→ 选两表 → 选主键 → 开始对比\n"
-            "  结果看：对比摘要 → 仅在表A → 仅在表B → 有变化（黄标）",
+            "  两千行级订单、一单多商品，必须用组合主键。",
+            "三、操作\n"
+            "  Excel 两表对比 → 选表 → 选主键 → 开始对比 → 看摘要/仅在A/B/有变化",
         ],
     )
 
@@ -709,10 +752,15 @@ def copy_to_desktop(generated: dict[str, Path]) -> Path:
 
 
 if __name__ == "__main__":
+    import time
+
+    t0 = time.perf_counter()
     files = generate_cases()
     desktop = copy_to_desktop(files)
+    elapsed = time.perf_counter() - t0
     print(f"案例目录: {CASES_DIR}")
     print(f"桌面副本: {desktop}")
+    print(f"生成耗时: {elapsed:.1f}s")
     for name, path in files.items():
         print(f"{name}: {path}")
     clean_path = files["customers"]
