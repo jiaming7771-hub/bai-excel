@@ -8,8 +8,9 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill
 
 from app_config import ensure_output_dir
-from utils.excel_utils import fill_worksheet, normalize_header_name, read_excel
+from utils.excel_utils import fill_worksheet, normalize_header_name, read_excel, write_excel
 from utils.error_handler import AppError
+from utils.output_paths import merge_paths
 
 # 同义词映射：把常见别名对齐到统一列名，减少「手机 vs 手机号」对不齐
 HEADER_ALIASES = {
@@ -38,6 +39,7 @@ YELLOW = PatternFill(fill_type="solid", fgColor="FFFFFF00")
 @dataclass
 class MergeResult:
     output_path: Path
+    report_path: Path
     file_count: int
     row_count: int
     warning_count: int = 0
@@ -196,20 +198,20 @@ def _build_null_stats(
     return pd.DataFrame(rows)
 
 
-def _write_merge_workbook(
+def _write_merge_result(path: Path, merged: pd.DataFrame) -> None:
+    write_excel(merged, path, sheet_name="合并结果")
+
+
+def _write_merge_report(
     path: Path,
-    merged: pd.DataFrame,
     summary: pd.DataFrame,
     matrix: pd.DataFrame,
     null_stats: pd.DataFrame,
     warnings: list[str],
 ) -> None:
     wb = Workbook()
-    ws_data = wb.active
-    ws_data.title = "合并结果"
-    fill_worksheet(ws_data, merged)
-
-    ws_sum = wb.create_sheet("列对齐报告")
+    ws_sum = wb.active
+    ws_sum.title = "列对齐报告"
     fill_worksheet(ws_sum, summary)
     warn_start = 6
     for row_idx in range(warn_start, ws_sum.max_row + 1):
@@ -231,19 +233,30 @@ def _write_merge_workbook(
                 for col_idx in range(1, ws_null.max_column + 1):
                     ws_null.cell(row=row_idx, column=col_idx).fill = YELLOW
 
+    ws_help = wb.create_sheet("说明")
+    help_df = pd.DataFrame(
+        [
+            {"项目": "本文件用途", "内容": "内部核对列对齐与空值，勿直接外传"},
+            {"项目": "结果文件", "内容": "同目录下的「合并结果_*.xlsx」仅含合并数据，可发给同事"},
+            {"项目": "发现问题", "内容": len(warnings)},
+            {"项目": "建议", "内容": "有橙色警告时，按「列名对照」「空值统计」回到源表改列名或补数据"},
+        ]
+    )
+    fill_worksheet(ws_help, help_df)
+
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         wb.save(path)
     except PermissionError as exc:
         raise AppError(
-            "无法保存结果文件",
-            "请确认输出文件没有被 Excel 打开，并且您有权限写入这个文件夹。",
+            "无法保存处理报告",
+            "请确认报告文件没有被 Excel 打开，并且您有权限写入这个文件夹。",
         ) from exc
 
 
 def merge_excels(
     paths: list[Path],
-    output_name: str = "merged_result.xlsx",
+    output_name: str | None = None,
     add_source_column: bool = True,
     progress_cb=None,
 ) -> MergeResult:
@@ -295,23 +308,30 @@ def merge_excels(
 
     aligned = [frame.reindex(columns=columns) for frame in frames]
     merged = pd.concat(aligned, ignore_index=True, sort=False)
-    output = ensure_output_dir() / output_name
+
+    stem = Path(paths[0]).stem if len(paths) == 1 else "多文件合并"
+    result_path, report_path = merge_paths(stem)
+    if output_name:
+        result_path = ensure_output_dir() / output_name
+
     if progress_cb:
-        progress_cb(95, "正在保存结果与对齐报告")
-    _write_merge_workbook(output, merged, summary, matrix, null_stats, warnings)
+        progress_cb(95, "正在保存结果与处理报告")
+    _write_merge_result(result_path, merged)
+    _write_merge_report(report_path, summary, matrix, null_stats, warnings)
     if progress_cb:
         progress_cb(100, "处理完成！")
 
     if warnings:
         detail = (
-            f"合并 {len(merged)} 行，发现 {len(warnings)} 个列对齐问题，"
-            "请打开结果里的「列对齐报告」查看"
+            f"结果 {len(merged)} 行已保存，可外传；"
+            f"发现 {len(warnings)} 个列对齐问题，请打开「处理报告」核对"
         )
     else:
-        detail = f"合并 {len(merged)} 行，列名均已对齐，详情见「列对齐报告」"
+        detail = f"结果 {len(merged)} 行已保存；列名均已对齐，详见「处理报告」"
 
     return MergeResult(
-        output_path=output,
+        output_path=result_path,
+        report_path=report_path,
         file_count=used_files,
         row_count=len(merged),
         warning_count=len(warnings),

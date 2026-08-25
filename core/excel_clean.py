@@ -10,8 +10,9 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill
 
 from app_config import ensure_output_dir
-from utils.excel_utils import fill_worksheet, read_excel
+from utils.excel_utils import fill_worksheet, read_excel, write_excel
 from utils.error_handler import AppError
+from utils.output_paths import clean_paths
 
 PHONE_RE = re.compile(r"^1[3-9]\d{9}$")
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
@@ -34,6 +35,7 @@ ORANGE = PatternFill(fill_type="solid", fgColor="FFFF9800")
 @dataclass
 class CleanResult:
     output_path: Path
+    report_path: Path
     original_rows: int
     cleaned_rows: int
     deleted_rows: int
@@ -702,6 +704,7 @@ def clean_excel(
             tags.append("待核对")
         markers.append("；".join(tags))
     cleaned_df.insert(0, "清洗标记", markers)
+    deliverable_df = cleaned_df.drop(columns=["清洗标记"]).copy()
 
     kept_uids = set(uid_list)
     fixed_records = []
@@ -774,12 +777,19 @@ def clean_excel(
         ]
     )
 
-    output = ensure_output_dir() / output_name
+    result_path, report_path = clean_paths(Path(path).stem)
+    if output_name != "cleaned_result.xlsx":
+        result_path = ensure_output_dir() / output_name
+
+    if progress_cb:
+        progress_cb(90, "正在保存清洗结果")
+    write_excel(deliverable_df, result_path, sheet_name="清洗结果")
+
     if progress_cb:
         progress_cb(92, "正在生成清洗报告")
     _write_clean_report(
-        output,
-        cleaned_df=cleaned_df,
+        report_path,
+        review_view_df=cleaned_df,
         quality_df=quality_df,
         fixed_df=fixed_df,
         deleted_df=deleted_df,
@@ -801,7 +811,8 @@ def clean_excel(
     if progress_cb:
         progress_cb(100, "清洗完成！")
     return CleanResult(
-        output_path=output,
+        output_path=result_path,
+        report_path=report_path,
         original_rows=original,
         cleaned_rows=cleaned,
         deleted_rows=deleted,
@@ -819,7 +830,7 @@ def clean_excel(
 def _write_clean_report(
     path: Path,
     *,
-    cleaned_df: pd.DataFrame,
+    review_view_df: pd.DataFrame,
     quality_df: pd.DataFrame,
     fixed_df: pd.DataFrame,
     deleted_df: pd.DataFrame,
@@ -851,11 +862,11 @@ def _write_clean_report(
             for col_idx in range(1, ws_q.max_column + 1):
                 ws_q.cell(row=row_idx, column=col_idx).fill = fill
 
-    ws1 = wb.create_sheet("清洗结果")
-    fill_worksheet(ws1, cleaned_df)
-    _apply_row_fills(ws1, cleaned_df)
-    _apply_highlights(ws1, cleaned_df, highlight_fixed, YELLOW)
-    _apply_highlights(ws1, cleaned_df, highlight_review, ORANGE)
+    ws1 = wb.create_sheet("核对视图")
+    fill_worksheet(ws1, review_view_df)
+    _apply_row_fills(ws1, review_view_df)
+    _apply_highlights(ws1, review_view_df, highlight_fixed, YELLOW)
+    _apply_highlights(ws1, review_view_df, highlight_review, ORANGE)
 
     ws_fixed = wb.create_sheet("已自动修复")
     fill_worksheet(ws_fixed, fixed_df)
@@ -886,7 +897,7 @@ def _write_clean_report(
             {"项目": "待人工核对行数", "内容": review_rows},
             {"项目": "数据健康度", "内容": quality_score},
             {"项目": "去重字段", "内容": dedupe_column or "未使用"},
-            {"项目": "怎么核对", "内容": "先看「清洗报告」→「已自动修复」→「待人工核对」→「清洗结果」"},
+            {"项目": "怎么核对", "内容": "结果文件可直接外传；本报告含核对视图、已修复、待核对、已删除"},
         ]
     )
     ws4 = wb.create_sheet("清洗说明")
@@ -897,8 +908,8 @@ def _write_clean_report(
         wb.save(path)
     except PermissionError as exc:
         raise AppError(
-            "无法保存结果文件",
-            "请确认输出文件没有被 Excel 打开，并且您有权限写入这个文件夹。",
+            "无法保存清洗报告",
+            "请确认报告文件没有被 Excel 打开，并且您有权限写入这个文件夹。",
         ) from exc
 
 

@@ -22,6 +22,7 @@ class ComparePage(FeaturePage):
         self.path_a: Path | None = None
         self.path_b: Path | None = None
         self.output_path: Path | None = None
+        self.report_path: Path | None = None
         self.columns: list[str] = []
 
         self.drop = DropZone("把两个 Excel 拖到这里（先 A 后 B，也可分别点选）")
@@ -52,6 +53,7 @@ class ComparePage(FeaturePage):
         self.layout_box.addWidget(self.key2)
 
         self.status.open_clicked.connect(self.open_output)
+        self.status.report_clicked.connect(self.open_report)
         self.attach_status()
 
     def add_paths(self, paths: list[str]) -> None:
@@ -148,16 +150,15 @@ class ComparePage(FeaturePage):
         self.start_btn.setEnabled(True)
         self.progress.finish()
         self.output_path = result.output_path
+        self.report_path = result.report_path
         self.status.show_ok(
             "对比完成！",
             (
                 f"{result.detail_text}\n\n"
-                "打开结果后看：\n"
-                "1）对比摘要\n"
-                "2）仅在表A / 仅在表B\n"
-                "3）有变化（黄标=两边不同）"
+                "结果文件为差异清单，可外传；处理报告含分表详情与标色。"
             ),
             result.output_path,
+            report=result.report_path,
         )
 
     def on_fail(self, title: str, hint: str) -> None:
@@ -168,3 +169,7 @@ class ComparePage(FeaturePage):
     def open_output(self) -> None:
         if self.output_path:
             open_file(self.output_path)
+
+    def open_report(self) -> None:
+        if self.report_path:
+            open_file(self.report_path)

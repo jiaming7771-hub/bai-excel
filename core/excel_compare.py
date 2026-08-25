@@ -8,8 +8,9 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill
 
 from app_config import ensure_output_dir
-from utils.excel_utils import fill_worksheet, read_excel
+from utils.excel_utils import fill_worksheet, read_excel, write_excel
 from utils.error_handler import AppError
+from utils.output_paths import compare_paths
 
 YELLOW = PatternFill(fill_type="solid", fgColor="FFFFFF00")
 ORANGE = PatternFill(fill_type="solid", fgColor="FFFF9800")
@@ -19,6 +20,7 @@ GREEN = PatternFill(fill_type="solid", fgColor="FFC8E6C9")
 @dataclass
 class CompareResult:
     output_path: Path
+    report_path: Path
     only_a: int
     only_b: int
     changed: int
@@ -56,7 +58,7 @@ def compare_excels(
     path_a: Path,
     path_b: Path,
     key_columns: list[str],
-    output_name: str = "compare_result.xlsx",
+    output_name: str | None = None,
     progress_cb=None,
 ) -> CompareResult:
     if not key_columns:
@@ -167,10 +169,24 @@ def compare_excels(
         ]
     )
 
-    output = ensure_output_dir() / output_name
+    combined_parts = [only_a_df, only_b_df, changed_df]
+    combined = pd.concat([p for p in combined_parts if not p.empty], ignore_index=True)
+    if combined.empty:
+        combined = pd.DataFrame(columns=["对比结果", "变化字段", *ordered_cols])
+
+    stem = f"{path_a.stem}_vs_{path_b.stem}"
+    result_path, report_path = compare_paths(stem)
+    if output_name:
+        result_path = ensure_output_dir() / output_name
+        report_path = ensure_output_dir() / f"{Path(output_name).stem}_报告.xlsx"
+
     if progress_cb:
-        progress_cb(90, "正在生成对比报告")
-    _write_compare_report(output, summary, only_a_df, only_b_df, changed_df)
+        progress_cb(88, "正在保存对比结果")
+    write_excel(combined, result_path, sheet_name="差异清单")
+
+    if progress_cb:
+        progress_cb(92, "正在生成对比报告")
+    _write_compare_report(report_path, summary, only_a_df, only_b_df, changed_df)
     if progress_cb:
         progress_cb(100, "对比完成！")
 
@@ -179,7 +195,8 @@ def compare_excels(
         f"有变化 {len(changed_rows)} 行，完全相同 {same_count} 行"
     )
     return CompareResult(
-        output_path=output,
+        output_path=result_path,
+        report_path=report_path,
         only_a=len(only_a_rows),
         only_b=len(only_b_rows),
         changed=len(changed_rows),
@@ -237,6 +254,6 @@ def _write_compare_report(
         wb.save(path)
     except PermissionError as exc:
         raise AppError(
-            "无法保存结果文件",
-            "请确认输出文件没有被 Excel 打开，并且您有权限写入这个文件夹。",
+            "无法保存对比报告",
+            "请确认报告文件没有被 Excel 打开，并且您有权限写入这个文件夹。",
         ) from exc

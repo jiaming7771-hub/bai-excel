@@ -25,6 +25,7 @@ class CleanPage(FeaturePage):
         )
         self.file_path: Path | None = None
         self.output_path: Path | None = None
+        self.report_path: Path | None = None
         self.columns: list[str] = []
 
         self.drop = DropZone("将 Excel 文件拖到这里")
@@ -87,6 +88,7 @@ class CleanPage(FeaturePage):
 
         self.opt_field.toggled.connect(self._sync_dedupe_ui)
         self.status.open_clicked.connect(self.open_output)
+        self.status.report_clicked.connect(self.open_report)
         self.attach_status()
         self._sync_dedupe_ui()
 
@@ -200,18 +202,16 @@ class CleanPage(FeaturePage):
         self.start_btn.setEnabled(True)
         self.progress.finish()
         self.output_path = result.output_path
+        self.report_path = result.report_path
         self.status.show_ok(
             "清洗完成！",
             (
                 f"{result.detail_text}\n"
                 f"{result.quality_summary}\n\n"
-                "请打开结果，按这个顺序看：\n"
-                "1）「清洗报告」——健康度与问题清单\n"
-                "2）「已自动修复」——原值→新值，抽查对不对\n"
-                "3）「待人工核对」——修不了的，需你处理\n"
-                "4）「清洗结果」——黄=已修，橙=待核"
+                "结果文件可直接外传；处理报告含核对视图、已修复、待核对、已删除。"
             ),
             result.output_path,
+            report=result.report_path,
         )
 
     def on_fail(self, title: str, hint: str) -> None:
@@ -222,3 +222,7 @@ class CleanPage(FeaturePage):
     def open_output(self) -> None:
         if self.output_path:
             open_file(self.output_path)
+
+    def open_report(self) -> None:
+        if self.report_path:
+            open_file(self.report_path)

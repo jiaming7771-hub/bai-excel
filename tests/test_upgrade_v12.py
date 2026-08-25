@@ -36,14 +36,16 @@ def test_merge_writes_alignment_report_sheets(tmp_path, monkeypatch):
     pd.DataFrame([{"客户名": "李四", "联系电话": "13900139001", "销售金额": 200}]).to_excel(b, index=False)
 
     result = merge_excels([a, b])
-    book = pd.ExcelFile(result.output_path)
-    assert "合并结果" in book.sheet_names
-    assert "列对齐报告" in book.sheet_names
-    assert "列名对照" in book.sheet_names
-    assert "空值统计" in book.sheet_names
+    result_book = pd.ExcelFile(result.output_path)
+    assert result_book.sheet_names == ["合并结果"]
     merged = pd.read_excel(result.output_path, sheet_name="合并结果")
     assert "销售额" in merged.columns
     assert "销售金额" not in merged.columns
+
+    report_book = pd.ExcelFile(result.report_path)
+    assert "列对齐报告" in report_book.sheet_names
+    assert "列名对照" in report_book.sheet_names
+    assert "空值统计" in report_book.sheet_names
     assert result.warning_count >= 0
 
 
@@ -110,6 +112,7 @@ def test_clean_keep_latest_and_combo_key(tmp_path, monkeypatch):
         dedupe_latest_column="更新时间",
     )
     cleaned = pd.read_excel(result.output_path, sheet_name="清洗结果")
+    assert "清洗标记" not in cleaned.columns
     # 张三同手机只留最新；李四手机不同都留
     assert len(cleaned) == 3
     zhang = cleaned[cleaned["姓名"] == "张三"].iloc[0]
@@ -143,9 +146,12 @@ def test_compare_two_tables(tmp_path, monkeypatch):
     assert result.changed == 1  # 张三城市变了
     assert result.same == 1
 
-    only_a = pd.read_excel(result.output_path, sheet_name="仅在表A")
-    only_b = pd.read_excel(result.output_path, sheet_name="仅在表B")
-    changed = pd.read_excel(result.output_path, sheet_name="有变化")
+    diff = pd.read_excel(result.output_path, sheet_name="差异清单")
+    assert len(diff) == 3
+
+    only_a = pd.read_excel(result.report_path, sheet_name="仅在表A")
+    only_b = pd.read_excel(result.report_path, sheet_name="仅在表B")
+    changed = pd.read_excel(result.report_path, sheet_name="有变化")
     assert len(only_a) == 1
     assert len(only_b) == 1
     assert len(changed) == 1

@@ -105,10 +105,13 @@ class DropZone(QFrame):
 class StatusBox(QFrame):
     retry_clicked = Signal()
     open_clicked = Signal()
+    report_clicked = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setVisible(False)
+        self._folder: Path | None = None
+        self._report: Path | None = None
         self.layout_box = QVBoxLayout(self)
         self.title = QLabel()
         self.detail = QLabel()
@@ -116,12 +119,15 @@ class StatusBox(QFrame):
         self.detail.setObjectName("muted")
         self.retry_btn = SecondaryButton("重新选择文件")
         self.open_btn = SecondaryButton("打开结果文件")
+        self.report_btn = SecondaryButton("打开处理报告")
         self.retry_btn.clicked.connect(self.retry_clicked.emit)
         self.open_btn.clicked.connect(self.open_clicked.emit)
+        self.report_btn.clicked.connect(self.report_clicked.emit)
         self.layout_box.addWidget(self.title)
         self.layout_box.addWidget(self.detail)
         self.layout_box.addWidget(self.retry_btn, alignment=Qt.AlignmentFlag.AlignLeft)
         self.layout_box.addWidget(self.open_btn, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.layout_box.addWidget(self.report_btn, alignment=Qt.AlignmentFlag.AlignLeft)
 
     def show_error(self, title: str, hint: str) -> None:
         self.setObjectName("errorBox")
@@ -130,17 +136,20 @@ class StatusBox(QFrame):
         self.detail.setText(hint)
         self.retry_btn.setVisible(True)
         self.open_btn.setVisible(False)
+        self.report_btn.setVisible(False)
         self.setVisible(True)
         self._refresh()
 
-    def show_ok(self, title: str, hint: str, folder: str | Path | None = None) -> None:
+    def show_ok(self, title: str, hint: str, folder: str | Path | None = None, report: str | Path | None = None) -> None:
         self.setObjectName("okBox")
         self.title.setObjectName("okTitle")
         self.title.setText(title)
         self.detail.setText(hint)
         self.retry_btn.setVisible(False)
-        self.open_btn.setVisible(bool(folder))
         self._folder = Path(folder) if folder else None
+        self._report = Path(report) if report else None
+        self.open_btn.setVisible(bool(self._folder))
+        self.report_btn.setVisible(bool(self._report))
         self.setVisible(True)
         self._refresh()
 

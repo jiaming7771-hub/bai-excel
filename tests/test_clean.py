@@ -18,7 +18,7 @@ def test_clean_removes_duplicates_and_blanks(testdata, tmp_path, monkeypatch):
         dedupe_column="手机号",
     )
     cleaned = pd.read_excel(result.output_path, sheet_name="清洗结果")
-    deleted = pd.read_excel(result.output_path, sheet_name="已删除记录")
+    deleted = pd.read_excel(result.report_path, sheet_name="已删除记录")
     assert result.original_rows == len(original)
     assert result.cleaned_rows == len(cleaned)
     assert result.deleted_rows == result.original_rows - result.cleaned_rows
@@ -26,6 +26,7 @@ def test_clean_removes_duplicates_and_blanks(testdata, tmp_path, monkeypatch):
     assert len(deleted) == result.deleted_rows
     assert "删除原因" in deleted.columns
     assert cleaned["手机号"].dropna().duplicated().sum() == 0
+    assert "清洗标记" not in cleaned.columns
 
 
 def test_clean_fixes_and_flags_instead_of_deleting(tmp_path, monkeypatch):
@@ -53,12 +54,12 @@ def test_clean_fixes_and_flags_instead_of_deleting(tmp_path, monkeypatch):
         fix_dates=True,
     )
     cleaned = pd.read_excel(result.output_path, sheet_name="清洗结果")
-    review = pd.read_excel(result.output_path, sheet_name="待人工核对")
-    fixed_log = pd.read_excel(result.output_path, sheet_name="已自动修复")
-    quality = pd.read_excel(result.output_path, sheet_name="清洗报告")
-    deleted = pd.read_excel(result.output_path, sheet_name="已删除记录")
-    wb = load_workbook(result.output_path)
-    ws = wb["清洗结果"]
+    review = pd.read_excel(result.report_path, sheet_name="待人工核对")
+    fixed_log = pd.read_excel(result.report_path, sheet_name="已自动修复")
+    quality = pd.read_excel(result.report_path, sheet_name="清洗报告")
+    deleted = pd.read_excel(result.report_path, sheet_name="已删除记录")
+    wb = load_workbook(result.report_path)
+    ws = wb["核对视图"]
 
     assert "清洗报告" in wb.sheetnames
     assert "数据健康度" in quality["项目"].astype(str).tolist()
@@ -91,6 +92,8 @@ def test_clean_fixes_and_flags_instead_of_deleting(tmp_path, monkeypatch):
                 fills.append(str(cell.fill.fgColor.rgb))
     assert any("FFFF00" in f for f in fills)
     assert any("FF9800" in f for f in fills)
-    assert "清洗标记" in cleaned.columns
-    assert "已修复" in cleaned["清洗标记"].astype(str).tolist()
-    assert any("待核对" in str(x) for x in cleaned["清洗标记"].tolist())
+    assert "清洗标记" not in cleaned.columns
+    review_view = pd.read_excel(result.report_path, sheet_name="核对视图")
+    assert "清洗标记" in review_view.columns
+    assert "已修复" in review_view["清洗标记"].astype(str).tolist()
+    assert any("待核对" in str(x) for x in review_view["清洗标记"].tolist())

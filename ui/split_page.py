@@ -9,7 +9,7 @@ from ui.feature_page import FeaturePage
 from ui.widgets import DropZone, FieldSelect, PrimaryButton, SecondaryButton
 from utils.excel_utils import list_columns, list_sheet_names, read_excel
 from utils.error_handler import AppError, friendly_error
-from utils.file_utils import collect_excel_files, open_folder
+from utils.file_utils import collect_excel_files, open_file, open_folder
 
 
 class SplitPage(FeaturePage):
@@ -21,6 +21,7 @@ class SplitPage(FeaturePage):
         )
         self.file_path: Path | None = None
         self.output_dir: Path | None = None
+        self.report_path: Path | None = None
         self.columns: list[str] = []
 
         self.drop = DropZone("将 Excel 文件拖到这里")
@@ -62,6 +63,7 @@ class SplitPage(FeaturePage):
         self.layout_box.addWidget(self.rows_spin)
 
         self.status.open_clicked.connect(self.open_output)
+        self.status.report_clicked.connect(self.open_report)
         self.attach_status()
         self._sync_mode_ui()
 
@@ -136,11 +138,13 @@ class SplitPage(FeaturePage):
         self.start_btn.setEnabled(True)
         self.progress.finish()
         self.output_dir = result.output_dir
-        mode_text = {"column": "按字段", "sheet": "按工作表", "rows": "按行数"}.get(result.mode, result.mode)
+        self.report_path = result.report_path
+        detail = result.detail_text or f"拆分完成，共生成 {result.file_count} 个文件。"
         self.status.show_ok(
             "处理完成！",
-            f"{mode_text}拆分完成，共生成 {result.file_count} 个文件。",
+            detail,
             result.output_dir,
+            report=result.report_path,
         )
 
     def on_fail(self, title: str, hint: str) -> None:
@@ -151,3 +155,7 @@ class SplitPage(FeaturePage):
     def open_output(self) -> None:
         if self.output_dir:
             open_folder(self.output_dir)
+
+    def open_report(self) -> None:
+        if self.report_path:
+            open_file(self.report_path)

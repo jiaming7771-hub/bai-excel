@@ -8,18 +8,19 @@ from core.excel_merge import MergeResult, merge_excels
 from ui.feature_page import FeaturePage
 from ui.widgets import DropZone, PrimaryButton, SecondaryButton
 from utils.error_handler import AppError
-from utils.file_utils import collect_excel_files, open_folder
+from utils.file_utils import collect_excel_files, open_file
 
 
 class MergePage(FeaturePage):
     def __init__(self, parent=None) -> None:
         super().__init__(
             "Excel 批量合并",
-            "请选择需要合并的 Excel。列名相近会自动对齐；结果里带「列对齐报告」，不用逐行猜哪列没对上。",
+            "请选择需要合并的 Excel。列名相近会自动对齐；干净结果可外传，列对齐详情在「处理报告」。",
             parent,
         )
         self.files: list[Path] = []
         self.output_path: Path | None = None
+        self.report_path: Path | None = None
 
         self.drop = DropZone("将 Excel 文件拖到这里，也可以选择文件或文件夹")
         self.drop.setMinimumHeight(110)
@@ -45,6 +46,7 @@ class MergePage(FeaturePage):
         self.layout_box.addWidget(self.file_list)
 
         self.status.open_clicked.connect(self.open_output)
+        self.status.report_clicked.connect(self.open_report)
         self.attach_status()
 
     def add_paths(self, paths: list[str]) -> None:
@@ -95,10 +97,12 @@ class MergePage(FeaturePage):
         self.start_btn.setEnabled(True)
         self.progress.finish()
         self.output_path = result.output_path
+        self.report_path = result.report_path
         self.status.show_ok(
             "处理完成！",
             result.detail_text or f"合并完成，共处理 {result.file_count} 个文件，共 {result.row_count} 条数据。",
             result.output_path,
+            report=result.report_path,
         )
 
     def on_fail(self, title: str, hint: str) -> None:
@@ -108,4 +112,8 @@ class MergePage(FeaturePage):
 
     def open_output(self) -> None:
         if self.output_path:
-            open_folder(self.output_path)
+            open_file(self.output_path)
+
+    def open_report(self) -> None:
+        if self.report_path:
+            open_file(self.report_path)
